@@ -104,6 +104,7 @@ failures:
 | `dedup` | Deduplicate incidents using semantic similarity |
 | `export` | Export incidents to multiple formats (JSONL, Markdown, Parquet) |
 | `report` | Generate quality report and dataset card |
+| `judge` | Evaluate incident quality using LLM-as-judge rubric |
 | `schema` | Export JSON schema for Incident model |
 
 ## LLM Configuration
@@ -193,20 +194,28 @@ mypy incidentforge
 ```
 incidentforge/
 ├── cli.py              # Typer CLI interface
+├── config.py           # Layered configuration (CLI > ENV > TOML > defaults)
 ├── models.py           # Pydantic schemas (Topology, FailureCatalog, Incident)
 ├── topology.py         # Topology loader & validator
 ├── failures.py         # Failure catalog loader
 ├── planner.py          # Deterministic task planner
 ├── client.py           # LLM client abstraction
-├── retry.py            # Retry policies
+├── retry.py            # Retry policies (exponential backoff + Retry-After)
 ├── generator.py        # Async generation orchestrator
-├── prompts.py          # Jinja2 prompt templates
-├── validators.py       # Multi-layer validation
-├── dedup.py            # Semantic deduplication
-├── exporter.py         # Multi-format exporters
-├── report.py           # Quality reporting
+├── prompts.py          # Jinja2 prompt templates + prompt injection sanitization
+├── validators.py       # Multi-layer validation (schema, semantic, security/PII)
+├── dedup.py            # Semantic deduplication (embeddings + MinHash)
+├── exporter.py         # Multi-format exporters (JSONL, Markdown, Parquet)
+├── report.py           # Quality reporting & HF dataset card
 └── __init__.py         # Package exports
 ```
+
+## Configuration & Container
+
+- `configs/incidentforge.toml`: Layered config example (`--config`)
+- `.env.example`: Environment variables template (`INCIDENTFORGE_API_KEY=[REDACTED]`)
+- `schema/`: Exported JSON Schemas (`incident.schema.json`, `topology.schema.json`, `failures.schema.json`)
+- `Dockerfile`: Multi-stage image running non-root `incidentforge` entrypoint
 
 ## Requirements
 

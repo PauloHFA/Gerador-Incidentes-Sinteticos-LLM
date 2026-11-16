@@ -109,12 +109,12 @@ async def index_incidents(
 
     # Insert in batches
     for i in range(0, len(incidents), batch_size):
-        batch_incidents = incidents[i:i + batch_size]
-        batch_embeddings = embeddings[i:i + batch_size]
+        batch_incidents = incidents[i : i + batch_size]
+        batch_embeddings = embeddings[i : i + batch_size]
 
         # Prepare values for batch insert
         values = []
-        for incident, embedding in zip(batch_incidents, batch_embeddings):
+        for incident, embedding in zip(batch_incidents, batch_embeddings, strict=False):
             metadata = {
                 "service": incident.service,
                 "severity": incident.severity.value,
@@ -126,20 +126,23 @@ async def index_incidents(
                 "seed": incident.metadata.seed,
             }
 
-            values.append((
-                incident.id,
-                incident.service,
-                incident.severity.value,
-                incident.failure_category.value,
-                incident.outage_duration_minutes,
-                incident.metadata.generated_at,
-                documents[i + batch_incidents.index(incident)],
-                json.dumps(metadata),
-                embedding.tolist(),
-            ))
+            values.append(
+                (
+                    incident.id,
+                    incident.service,
+                    incident.severity.value,
+                    incident.failure_category.value,
+                    incident.outage_duration_minutes,
+                    incident.metadata.generated_at,
+                    documents[i + batch_incidents.index(incident)],
+                    json.dumps(metadata),
+                    embedding.tolist(),
+                )
+            )
 
         # Batch insert
-        await conn.executemany("""
+        await conn.executemany(
+            """
             INSERT INTO incidents (id, service, severity, category, duration_minutes, generated_at, document, metadata, embedding)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             ON CONFLICT (id) DO UPDATE SET
@@ -151,9 +154,13 @@ async def index_incidents(
                 document = EXCLUDED.document,
                 metadata = EXCLUDED.metadata,
                 embedding = EXCLUDED.embedding
-        """, values)
+        """,
+            values,
+        )
 
-        print(f"  Indexed batch {i // batch_size + 1}/{(len(incidents) + batch_size - 1) // batch_size}")
+        print(
+            f"  Indexed batch {i // batch_size + 1}/{(len(incidents) + batch_size - 1) // batch_size}"
+        )
 
     print(f"Indexed {len(incidents)} incidents in PostgreSQL")
 
@@ -205,17 +212,19 @@ async def search_incidents(
 
     results = []
     for row in rows:
-        results.append({
-            "id": row["id"],
-            "service": row["service"],
-            "severity": row["severity"],
-            "category": row["category"],
-            "duration_minutes": row["duration_minutes"],
-            "generated_at": row["generated_at"],
-            "document": row["document"],
-            "metadata": row["metadata"],
-            "similarity": float(row["similarity"]),
-        })
+        results.append(
+            {
+                "id": row["id"],
+                "service": row["service"],
+                "severity": row["severity"],
+                "category": row["category"],
+                "duration_minutes": row["duration_minutes"],
+                "generated_at": row["generated_at"],
+                "document": row["document"],
+                "metadata": row["metadata"],
+                "similarity": float(row["similarity"]),
+            }
+        )
 
     return results
 
@@ -230,7 +239,7 @@ def print_search_results(results: list[dict[str, Any]]) -> None:
     print("-" * 80)
 
     for i, result in enumerate(results):
-        print(f"\n{i+1}. {result['id']} (similarity: {result['similarity']:.3f})")
+        print(f"\n{i + 1}. {result['id']} (similarity: {result['similarity']:.3f})")
         print(f"   Service: {result['service']}")
         print(f"   Severity: {result['severity']}")
         print(f"   Category: {result['category']}")
@@ -242,7 +251,9 @@ async def main():
     """Main example function."""
     # Configuration
     input_dir = Path("output")  # Directory with generated incidents
-    dsn = os.environ.get("POSTGRES_DSN", "postgresql://postgres:postgres@localhost:5432/incidentforge")
+    dsn = os.environ.get(
+        "POSTGRES_DSN", "postgresql://postgres:postgres@localhost:5432/incidentforge"
+    )
 
     # Load incidents
     print("Loading incidents...")

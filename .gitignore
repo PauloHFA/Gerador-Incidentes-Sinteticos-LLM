@@ -41,6 +41,8 @@ venv.bak/
 coverage.xml
 htmlcov/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .tox/
 .nox/
 
@@ -52,12 +54,20 @@ build/
 # IncidentForge state
 .incidentforge/
 output/
+output_dedup/
+export/
+reports/
 test_output/
+test_output.txt
+test_report/
 test_configs/
+test_yaml.yaml
 
 # Debug/fix scripts
 fix_*.py
 debug_*.py
+page_*.txt
+pdf_content.txt
 
 # OS
 .DS_Store

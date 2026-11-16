@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
-import hashlib
 import random
-from collections import Counter
 from dataclasses import dataclass
-from itertools import product
 from typing import Any
 
+from .failures import FailureCatalog, load_failure_catalog
 from .models import (
     ArchitectureProfile,
-    FailureCategory,
     GenerationPlan,
     GenerationTask,
     Language,
@@ -19,7 +16,6 @@ from .models import (
     Style,
     Topology,
 )
-from .failures import FailureCatalog, load_failure_catalog
 
 
 @dataclass
@@ -28,6 +24,7 @@ class PlannerConfig:
 
     count: int = 100
     seed: int = 42
+    severities: list[Severity] | None = None
     severity_distribution: dict[Severity, float] | None = None
     style_distribution: dict[Style, float] | None = None
     language_distribution: dict[Language, float] | None = None
@@ -45,9 +42,7 @@ class TaskPlanner:
         self._rng = random.Random(config.seed)
 
     def build_plan(
-        self,
-        topology: Topology,
-        catalog: FailureCatalog | None = None
+        self, topology: Topology, catalog: FailureCatalog | None = None
     ) -> GenerationPlan:
         """
         Build generation plan from topology and failure catalog.
@@ -61,12 +56,8 @@ class TaskPlanner:
         """
         if catalog is None:
             catalog = load_failure_catalog(
-                self.config.user_failures_path,
-                self.config.failures_mode
+                self.config.user_failures_path, self.config.failures_mode
             )
-
-        # Get all service names
-        service_names = [s.name for s in topology.services]
 
         # Build technology map for compatibility filtering
         service_technologies = {}
@@ -83,7 +74,7 @@ class TaskPlanner:
 
         # Build cartesian product: services × failures × severities
         all_tasks = []
-        severities = list(Severity)
+        severities = self.config.severities or list(Severity)
 
         for service_name, failure_categories in service_failures.items():
             for failure_category in failure_categories:
@@ -92,14 +83,16 @@ class TaskPlanner:
                         service_name=service_name,
                         failure_category=failure_category,
                         severity=severity,
-                                            style=Style.BLAMELESS_FORMAL,  # Will be overridden per task
+                        style=Style.BLAMELESS_FORMAL,  # Will be overridden per task
                         language=Language.EN,  # Will be overridden per task
                         architecture_profile=self.config.architecture_profile,
                     )
                     all_tasks.append(task)
 
         if not all_tasks:
-            raise ValueError("No valid task combinations found. Check topology and failure catalog compatibility.")
+            raise ValueError(
+                "No valid task combinations found. Check topology and failure catalog compatibility."
+            )
 
         # Apply severity distribution if specified
         if self.config.severity_distribution:
@@ -113,7 +106,7 @@ class TaskPlanner:
             # Repeat with variation if needed
             selected = self._select_with_variation(all_tasks, self.config.count)
         else:
-            selected = all_tasks[:self.config.count]
+            selected = all_tasks[: self.config.count]
 
         # Apply style and language distributions
         selected = self._apply_style_language_distribution(selected)
@@ -128,10 +121,7 @@ class TaskPlanner:
             estimated_tokens=estimated_tokens,
         )
 
-    def _apply_severity_distribution(
-        self,
-        tasks: list[GenerationTask]
-    ) -> list[GenerationTask]:
+    def _apply_severity_distribution(self, tasks: list[GenerationTask]) -> list[GenerationTask]:
         """Apply severity distribution to tasks."""
         target_dist = self.config.severity_distribution
         if not target_dist:
@@ -144,15 +134,13 @@ class TaskPlanner:
 
         # Calculate target counts
         total = len(tasks)
-        target_counts = {
-            sev: int(total * pct) for sev, pct in target_dist.items()
-        }
+        target_counts = {sev: int(total * pct) for sev, pct in target_dist.items()}
 
         # Adjust to match total
         diff = total - sum(target_counts.values())
-        if diff > 0:
+        if diff > 0 and target_counts:
             # Add to most common severity
-            most_common = max(target_counts, key=target_counts.get)
+            most_common = max(target_counts, key=lambda sev: target_counts[sev])
             target_counts[most_common] += diff
 
         # Select tasks per severity
@@ -168,8 +156,7 @@ class TaskPlanner:
         return result
 
     def _apply_style_language_distribution(
-        self,
-        tasks: list[GenerationTask]
+        self, tasks: list[GenerationTask]
     ) -> list[GenerationTask]:
         """Apply style and language distributions."""
         # For now, assign based on distribution or default
@@ -206,27 +193,18 @@ class TaskPlanner:
     def _select_with_variation(
         self,
         tasks: list[GenerationTask],
-        count: int
+        count: int,
     ) -> list[GenerationTask]:
-        """Select tasks with variation when count exceeds available."""
+        """Select tasks with independent model copies when count exceeds available."""
         if not tasks:
             return []
 
-        result = []
-        base_tasks = tasks.copy()
-
+        result: list[GenerationTask] = []
         while len(result) < count:
-            remaining = count - len(result)
-            if remaining >= len(base_tasks):
-                result.extend(base_tasks)
-            else:
-                result.extend(base_tasks[:remaining])
-                break
-
-            # Add variation for next iteration (different style/language)
-            for task in base_tasks:
-                # Create variation by changing style/language
-                pass  # Variation handled in _apply_style_language_distribution
+            for task in tasks:
+                if len(result) >= count:
+                    break
+                result.append(task.model_copy(deep=True))
 
         return result[:count]
 
@@ -317,72 +295,13 @@ def build_generation_plan(
 
 
 def print_plan_summary(plan: GenerationPlan) -> None:
-    """Print a summary of the generation plan."""
-    print(f"Generation Plan Summary")
-    print(f"======================")
-    print(f"Total tasks: {plan.total_count}")
-    print(f"Seed: {plan.seed}")
-    print(f"Estimated tokens: {plan.estimated_tokens:,}")
+    """Log a summary of the generation plan."""
+    import logging
 
-    # Distribution by severity
-    severity_counts = Counter(t.severity for t in plan.tasks)
-    print(f"\nBy Severity:")
-    for sev in Severity:
-        count = severity_counts.get(sev, 0)
-        pct = (count / plan.total_count * 100) if plan.total_count > 0 else 0
-        print(f"  {sev.value}: {count} ({pct:.1f}%)")
-
-    # Distribution by failure category
-    failure_counts = Counter(t.failure_category for t in plan.tasks)
-    print(f"\nBy Failure Category (top 10):")
-    for cat, count in failure_counts.most_common(10):
-        pct = (count / plan.total_count * 100) if plan.total_count > 0 else 0
-        print(f"  {cat.value}: {count} ({pct:.1f}%)")
-
-    # Distribution by service
-    service_counts = Counter(t.service_name for t in plan.tasks)
-    print(f"\nBy Service (top 10):")
-    for svc, count in service_counts.most_common(10):
-        pct = (count / plan.total_count * 100) if plan.total_count > 0 else 0
-        print(f"  {svc}: {count} ({pct:.1f}%)")
-
-    # Distribution by style
-    style_counts = Counter(t.style for t in plan.tasks)
-    print(f"\nBy Style:")
-    for style in Style:
-        count = style_counts.get(style, 0)
-        pct = (count / plan.total_count * 100) if plan.total_count > 0 else 0
-        print(f"  {style.value}: {count} ({pct:.1f}%)")
-
-    # Distribution by language
-    lang_counts = Counter(t.language for t in plan.tasks)
-    print(f"\nBy Language:")
-    for lang in Language:
-        count = lang_counts.get(lang, 0)
-        pct = (count / plan.total_count * 100) if plan.total_count > 0 else 0
-        print(f"  {lang.value}: {count} ({pct:.1f}%)")
-
-
-if __name__ == "__main__":
-    import sys
-    from .topology import load_topology
-
-    if len(sys.argv) > 1:
-        topology_path = sys.argv[1]
-    else:
-        topology_path = "configs/topology_sample.yaml"
-
-    count = int(sys.argv[2]) if len(sys.argv) > 2 else 50
-    seed = int(sys.argv[3]) if len(sys.argv) > 3 else 42
-
-    try:
-        topology = load_topology(topology_path)
-        plan = build_generation_plan(topology, count=count, seed=seed)
-        print_plan_summary(plan)
-
-        if len(sys.argv) > 4 and sys.argv[4] == "--dry-run":
-            print("\n[DRY RUN] Plan displayed above. No generation performed.")
-
-    except Exception as e:
-        print(f"[ERROR] Failed to build plan: {e}")
-        sys.exit(1)
+    log = logging.getLogger(__name__)
+    log.info(
+        "Generation plan summary: total=%d seed=%d estimated_tokens=%d",
+        plan.total_count,
+        plan.seed,
+        plan.estimated_tokens,
+    )

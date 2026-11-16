@@ -1,20 +1,29 @@
 """Tests for validators."""
 
 import pytest
+
+from incidentforge.models import (
+    ActionItem,
+    FailureCategory,
+    Incident,
+    IncidentMetadata,
+    Priority,
+    Service,
+    ServiceDependency,
+    ServiceSLO,
+    ServiceTechnology,
+    Severity,
+    SLAImpact,
+    TimelineEvent,
+    Topology,
+)
 from incidentforge.validators import (
-    ValidationContext,
     SchemaValidator,
-    SemanticValidator,
     SecurityValidator,
-    MultiLayerValidator,
+    SemanticValidator,
+    ValidationContext,
     create_validator,
     validate_incident,
-    ValidationResult,
-)
-from incidentforge.models import (
-    Incident, Topology, Service, ServiceTechnology, ServiceSLO, ServiceDependency,
-    TimelineEvent, SLAImpact, ActionItem, IncidentMetadata,
-    Severity, FailureCategory, Priority, Style, Language, ArchitectureProfile
 )
 
 
@@ -76,15 +85,48 @@ def create_valid_incident() -> Incident:
         ),
         root_cause_analysis="A connection leak in the nginx upstream module caused pool exhaustion. The HikariCP pool was not returning connections properly after requests to the auth-service.",
         timeline=[
-            TimelineEvent(timestamp="2024-01-15T10:00:00Z", event="Connection pool usage starts increasing", source="nginx", severity=Severity.SEV_4),
-            TimelineEvent(timestamp="2024-01-15T10:05:00Z", event="First 503 errors observed", source="api-gateway", severity=Severity.SEV_3),
-            TimelineEvent(timestamp="2024-01-15T10:15:00Z", event="Pool exhaustion, all requests failing", source="api-gateway", severity=Severity.SEV_2),
-            TimelineEvent(timestamp="2024-01-15T10:25:00Z", event="Restart of api-gateway pods", source="kubernetes", severity=Severity.SEV_2),
-            TimelineEvent(timestamp="2024-01-15T10:30:00Z", event="Service recovered", source="api-gateway", severity=Severity.SEV_4),
+            TimelineEvent(
+                timestamp="2024-01-15T10:00:00Z",
+                event="Connection pool usage starts increasing",
+                source="nginx",
+                severity=Severity.SEV_4,
+            ),
+            TimelineEvent(
+                timestamp="2024-01-15T10:05:00Z",
+                event="First 503 errors observed",
+                source="api-gateway",
+                severity=Severity.SEV_3,
+            ),
+            TimelineEvent(
+                timestamp="2024-01-15T10:15:00Z",
+                event="Pool exhaustion, all requests failing",
+                source="api-gateway",
+                severity=Severity.SEV_2,
+            ),
+            TimelineEvent(
+                timestamp="2024-01-15T10:25:00Z",
+                event="Restart of api-gateway pods",
+                source="kubernetes",
+                severity=Severity.SEV_2,
+            ),
+            TimelineEvent(
+                timestamp="2024-01-15T10:30:00Z",
+                event="Service recovered",
+                source="api-gateway",
+                severity=Severity.SEV_4,
+            ),
         ],
         action_items=[
-            ActionItem(action="Fix connection leak in nginx upstream configuration", owner="platform-team", priority=Priority.P0),
-            ActionItem(action="Add connection pool monitoring and alerts", owner="platform-team", priority=Priority.P1),
+            ActionItem(
+                action="Fix connection leak in nginx upstream configuration",
+                owner="platform-team",
+                priority=Priority.P0,
+            ),
+            ActionItem(
+                action="Add connection pool monitoring and alerts",
+                owner="platform-team",
+                priority=Priority.P1,
+            ),
         ],
         metadata=IncidentMetadata(
             model="gpt-4o-mini",
@@ -274,7 +316,9 @@ class TestSecurityValidator:
     def test_email_detection(self):
         """Test detection of email addresses."""
         incident = create_valid_incident()
-        incident.root_cause_analysis = "Contact admin@example.com for details on the connection leak in nginx."
+        incident.root_cause_analysis = (
+            "Contact admin@example.com for details on the connection leak in nginx."
+        )
 
         validator = SecurityValidator(self.context)
         result = validator.validate(incident)
@@ -285,7 +329,9 @@ class TestSecurityValidator:
     def test_credit_card_detection(self):
         """Test detection of credit card numbers."""
         incident = create_valid_incident()
-        incident.root_cause_analysis = "Payment failed for card 4111 1111 1111 1111 due to connection leak."
+        incident.root_cause_analysis = (
+            "Payment failed for card 4111 1111 1111 1111 due to connection leak."
+        )
 
         validator = SecurityValidator(self.context)
         result = validator.validate(incident)
@@ -307,7 +353,9 @@ class TestSecurityValidator:
     def test_api_key_detection(self):
         """Test detection of API keys."""
         incident = create_valid_incident()
-        incident.root_cause_analysis = "The API key sk-abcdefghijklmnopqrstuvwxyz12345678901234567890 was exposed."
+        incident.root_cause_analysis = (
+            "The API key sk-abcdefghijklmnopqrstuvwxyz12345678901234567890 was exposed."
+        )
 
         validator = SecurityValidator(self.context)
         result = validator.validate(incident)

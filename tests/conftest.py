@@ -1,13 +1,26 @@
 """Pytest configuration and fixtures."""
 
-import pytest
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from incidentforge.models import (
-    Incident, Topology, Service, ServiceTechnology, ServiceSLO, ServiceDependency,
-    FailureCatalog, FailureTemplate, TimelineEvent, SLAImpact, ActionItem, IncidentMetadata,
-    Severity, FailureCategory, Priority, Style, Language, ArchitectureProfile
+    ActionItem,
+    FailureCatalog,
+    FailureCategory,
+    FailureTemplate,
+    Incident,
+    IncidentMetadata,
+    Priority,
+    Service,
+    ServiceDependency,
+    ServiceSLO,
+    ServiceTechnology,
+    Severity,
+    SLAImpact,
+    TimelineEvent,
+    Topology,
 )
 
 
@@ -50,6 +63,14 @@ def sample_topology() -> Topology:
                 ],
                 slo=ServiceSLO(availability_target=0.9999, latency_p99_ms=10),
                 team="data-team",
+            ),
+            Service(
+                name="rate-limit-cache",
+                technology=[
+                    ServiceTechnology(name="Redis", category="cache"),
+                ],
+                slo=ServiceSLO(availability_target=0.9999, latency_p99_ms=5),
+                team="platform-team",
             ),
         ],
     )
@@ -117,15 +138,48 @@ def valid_incident() -> Incident:
         ),
         root_cause_analysis="A connection leak in the nginx upstream module caused pool exhaustion. The HikariCP pool was not returning connections properly after requests to the auth-service.",
         timeline=[
-            TimelineEvent(timestamp="2024-01-15T10:00:00Z", event="Connection pool usage starts increasing", source="nginx", severity=Severity.SEV_4),
-            TimelineEvent(timestamp="2024-01-15T10:05:00Z", event="First 503 errors observed", source="api-gateway", severity=Severity.SEV_3),
-            TimelineEvent(timestamp="2024-01-15T10:15:00Z", event="Pool exhaustion, all requests failing", source="api-gateway", severity=Severity.SEV_2),
-            TimelineEvent(timestamp="2024-01-15T10:25:00Z", event="Restart of api-gateway pods", source="kubernetes", severity=Severity.SEV_2),
-            TimelineEvent(timestamp="2024-01-15T10:30:00Z", event="Service recovered", source="api-gateway", severity=Severity.SEV_4),
+            TimelineEvent(
+                timestamp="2024-01-15T10:00:00Z",
+                event="Connection pool usage starts increasing",
+                source="nginx",
+                severity=Severity.SEV_4,
+            ),
+            TimelineEvent(
+                timestamp="2024-01-15T10:05:00Z",
+                event="First 503 errors observed",
+                source="api-gateway",
+                severity=Severity.SEV_3,
+            ),
+            TimelineEvent(
+                timestamp="2024-01-15T10:15:00Z",
+                event="Pool exhaustion, all requests failing",
+                source="api-gateway",
+                severity=Severity.SEV_2,
+            ),
+            TimelineEvent(
+                timestamp="2024-01-15T10:25:00Z",
+                event="Restart of api-gateway pods",
+                source="kubernetes",
+                severity=Severity.SEV_2,
+            ),
+            TimelineEvent(
+                timestamp="2024-01-15T10:30:00Z",
+                event="Service recovered",
+                source="api-gateway",
+                severity=Severity.SEV_4,
+            ),
         ],
         action_items=[
-            ActionItem(action="Fix connection leak in nginx upstream configuration", owner="platform-team", priority=Priority.P0),
-            ActionItem(action="Add connection pool monitoring and alerts", owner="platform-team", priority=Priority.P1),
+            ActionItem(
+                action="Fix connection leak in nginx upstream configuration",
+                owner="platform-team",
+                priority=Priority.P0,
+            ),
+            ActionItem(
+                action="Add connection pool monitoring and alerts",
+                owner="platform-team",
+                priority=Priority.P1,
+            ),
         ],
         metadata=IncidentMetadata(
             model="gpt-4o-mini",
@@ -148,15 +202,9 @@ def temp_dir():
 # Pytest configuration
 def pytest_configure(config):
     """Configure pytest."""
-    config.addinivalue_line(
-        "markers", "asyncio: mark test as async"
-    )
-    config.addinivalue_line(
-        "markers", "slow: mark test as slow"
-    )
-    config.addinivalue_line(
-        "markers", "integration: mark test as integration test"
-    )
+    config.addinivalue_line("markers", "asyncio: mark test as async")
+    config.addinivalue_line("markers", "slow: mark test as slow")
+    config.addinivalue_line("markers", "integration: mark test as integration test")
 
 
 # Async test support
@@ -164,6 +212,7 @@ def pytest_configure(config):
 def event_loop():
     """Create event loop for async tests."""
     import asyncio
+
     loop = asyncio.new_event_loop()
     yield loop
     loop.close()

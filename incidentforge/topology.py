@@ -9,7 +9,7 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
-from .models import Topology, Service, ServiceDependency
+from .models import Topology
 
 
 class TopologyLoader:
@@ -44,7 +44,7 @@ class TopologyLoader:
         if not path.exists():
             raise FileNotFoundError(f"Topology file not found: {path}")
 
-        with open(path, "r", encoding="utf-8") as f:
+        with path.open(encoding="utf-8") as f:
             try:
                 data = yaml.safe_load(f)
             except yaml.YAMLError as e:
@@ -77,11 +77,13 @@ class TopologyLoader:
                 raise
             # In non-strict mode, try to provide helpful error messages
             errors = self._format_validation_errors(e)
-            raise ValueError(f"Topology validation failed:\n" + "\n".join(errors)) from e
+            raise ValueError("Topology validation failed:\n" + "\n".join(errors)) from e
 
         # Check for dependency cycles (warning only)
         if topology.has_cycles():
-            cycle_warning = "Topology contains dependency cycles (this is realistic for distributed systems)"
+            cycle_warning = (
+                "Topology contains dependency cycles (this is realistic for distributed systems)"
+            )
             self.warnings.append(cycle_warning)
             warnings.warn(cycle_warning, UserWarning, stacklevel=2)
 
@@ -195,9 +197,12 @@ class TopologyValidator:
 
             # Critical path services should have more replicas
             dependents = topology.get_dependents(service.name)
-            critical_dependents = sum(1 for d in dependents
-                                      for dep in d.dependencies
-                                      if dep.target == service.name and dep.critical)
+            critical_dependents = sum(
+                1
+                for d in dependents
+                for dep in d.dependencies
+                if dep.target == service.name and dep.critical
+            )
             if critical_dependents >= 3 and service.replicas < 3:
                 warnings.append(
                     f"Service '{service.name}' is critical dependency for {critical_dependents} "
@@ -217,43 +222,6 @@ class TopologyValidator:
 
 
 def load_topology(path: str | Path, strict: bool = True) -> Topology:
-    """
-    Convenience function to load and validate topology.
-
-    Args:
-        path: Path to topology YAML file.
-        strict: If True, raise on validation errors.
-
-    Returns:
-        Validated Topology object.
-    """
+    """Load and validate topology."""
     loader = TopologyLoader(strict=strict)
     return loader.load(path)
-
-
-if __name__ == "__main__":
-    import sys
-
-    if len(sys.argv) > 1:
-        topology_path = sys.argv[1]
-    else:
-        topology_path = "configs/topology_sample.yaml"
-
-    try:
-        topology = load_topology(topology_path)
-        print(f"[OK] Topology loaded successfully: {len(topology.services)} services")
-
-        # Run semantic validations
-        validator = TopologyValidator()
-        semantic_warnings = validator.validate_all(topology)
-        for warn in semantic_warnings:
-                    print(f"[WARN] {warn}")
-
-        if semantic_warnings:
-            print(f"\nTotal semantic warnings: {len(semantic_warnings)}")
-        else:
-            print("No semantic warnings.")
-
-    except Exception as e:
-        print(f"[ERROR] Failed to load topology: {e}")
-        sys.exit(1)

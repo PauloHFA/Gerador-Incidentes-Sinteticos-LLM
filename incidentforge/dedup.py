@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -133,7 +131,7 @@ class MinHashDeduplicator:
         shingles = set()
 
         for i in range(len(words) - k + 1):
-            shingle = " ".join(words[i:i + k])
+            shingle = " ".join(words[i : i + k])
             shingles.add(shingle)
 
         return shingles
@@ -209,7 +207,9 @@ class DiversityController:
         self.total_count = 0
 
     @classmethod
-    def from_incidents(cls, incidents: list[Incident], config: DedupConfig | None = None) -> DiversityController:
+    def from_incidents(
+        cls, incidents: list[Incident], config: DedupConfig | None = None
+    ) -> DiversityController:
         """Create controller from existing incidents."""
         if config is None:
             config = DedupConfig()
@@ -272,10 +272,7 @@ class DiversityController:
         if self.total_count == 0:
             return {}
 
-        return {
-            cat: count / self.total_count
-            for cat, count in self.category_counts.items()
-        }
+        return {cat: count / self.total_count for cat, count in self.category_counts.items()}
 
     def get_stats(self) -> dict[str, Any]:
         """Get deduplication statistics."""
@@ -293,135 +290,3 @@ def create_dedup_controller(config: DedupConfig | None = None) -> DiversityContr
     if config is None:
         config = DedupConfig()
     return DiversityController(config)
-
-
-if __name__ == "__main__":
-    # Test deduplication
-    from .models import (
-        Incident, TimelineEvent, SLAImpact, ActionItem, IncidentMetadata,
-        Severity, FailureCategory, Priority, Language, Style, ArchitectureProfile
-    )
-
-    config = DedupConfig(
-        similarity_threshold=0.92,
-        use_embeddings=True,
-        use_minhash=True,
-    )
-
-    controller = create_dedup_controller(config)
-
-    # Create test incidents
-    base_incident = Incident(
-        id="INC-2024-0001",
-        service="api-gateway",
-        severity=Severity.SEV_2,
-        outage_duration_minutes=30,
-        failure_category=FailureCategory.CONNECTION_LEAK,
-        sla_impact=SLAImpact(
-            availability_before=0.9999,
-            availability_after=0.9950,
-            p99_latency_ms=5000,
-        ),
-        root_cause_analysis="A connection leak in the nginx upstream module caused pool exhaustion. The HikariCP pool was not returning connections properly after requests to the auth-service.",
-        timeline=[
-            TimelineEvent(timestamp="2024-01-15T10:00:00Z", event="Connection pool usage starts increasing", source="nginx", severity=Severity.SEV_4),
-            TimelineEvent(timestamp="2024-01-15T10:05:00Z", event="First 503 errors observed", source="api-gateway", severity=Severity.SEV_3),
-            TimelineEvent(timestamp="2024-01-15T10:15:00Z", event="Pool exhaustion, all requests failing", source="api-gateway", severity=Severity.SEV_2),
-            TimelineEvent(timestamp="2024-01-15T10:25:00Z", event="Restart of api-gateway pods", source="kubernetes", severity=Severity.SEV_2),
-            TimelineEvent(timestamp="2024-01-15T10:30:00Z", event="Service recovered", source="api-gateway", severity=Severity.SEV_4),
-        ],
-        action_items=[
-            ActionItem(action="Fix connection leak in nginx upstream configuration", owner="platform-team", priority=Priority.P0),
-            ActionItem(action="Add connection pool monitoring and alerts", owner="platform-team", priority=Priority.P1),
-        ],
-        metadata=IncidentMetadata(
-            model="gpt-4o-mini",
-            prompt_version="1.0",
-            seed=42,
-            generated_at="2024-01-15T11:00:00Z",
-            schema_version="1.0",
-            synthetic=True,
-        ),
-    )
-
-    # Add first incident
-    controller.add(base_incident)
-    print(f"Added first incident: {base_incident.id}")
-
-    # Create similar incident (should be detected as duplicate)
-    similar_incident = Incident(
-        id="INC-2024-0002",
-        service="api-gateway",
-        severity=Severity.SEV_2,
-        outage_duration_minutes=30,
-        failure_category=FailureCategory.CONNECTION_LEAK,
-        sla_impact=SLAImpact(
-            availability_before=0.9999,
-            availability_after=0.9950,
-            p99_latency_ms=5000,
-        ),
-        root_cause_analysis="A connection leak in the nginx upstream module caused pool exhaustion. The HikariCP pool was not returning connections properly after requests to the auth-service.",
-        timeline=[
-            TimelineEvent(timestamp="2024-01-15T10:00:00Z", event="Connection pool usage starts increasing", source="nginx", severity=Severity.SEV_4),
-            TimelineEvent(timestamp="2024-01-15T10:05:00Z", event="First 503 errors observed", source="api-gateway", severity=Severity.SEV_3),
-            TimelineEvent(timestamp="2024-01-15T10:15:00Z", event="Pool exhaustion, all requests failing", source="api-gateway", severity=Severity.SEV_2),
-            TimelineEvent(timestamp="2024-01-15T10:25:00Z", event="Restart of api-gateway pods", source="kubernetes", severity=Severity.SEV_2),
-            TimelineEvent(timestamp="2024-01-15T10:30:00Z", event="Service recovered", source="api-gateway", severity=Severity.SEV_4),
-        ],
-        action_items=[
-            ActionItem(action="Fix connection leak in nginx upstream configuration", owner="platform-team", priority=Priority.P0),
-            ActionItem(action="Add connection pool monitoring and alerts", owner="platform-team", priority=Priority.P1),
-        ],
-        metadata=IncidentMetadata(
-            model="gpt-4o-mini",
-            prompt_version="1.0",
-            seed=43,
-            generated_at="2024-01-15T11:00:00Z",
-            schema_version="1.0",
-            synthetic=True,
-        ),
-    )
-
-    is_dup, dup_id, sim = controller.check_duplicate(similar_incident)
-    print(f"Similar incident duplicate check: {is_dup} (id: {dup_id}, similarity: {sim:.4f})")
-
-    # Create different incident
-    different_incident = Incident(
-        id="INC-2024-0003",
-        service="auth-service",
-        severity=Severity.SEV_1,
-        outage_duration_minutes=45,
-        failure_category=FailureCategory.DEADLOCK,
-        sla_impact=SLAImpact(
-            availability_before=0.9995,
-            availability_after=0.9900,
-            p99_latency_ms=10000,
-        ),
-        root_cause_analysis="A database deadlock occurred in PostgreSQL when multiple transactions tried to update the same rows in different order. The Spring Boot application using HikariCP experienced transaction rollbacks.",
-        timeline=[
-            TimelineEvent(timestamp="2024-01-15T14:00:00Z", event="Deadlock detected in PostgreSQL logs", source="postgresql", severity=Severity.SEV_3),
-            TimelineEvent(timestamp="2024-01-15T14:10:00Z", event="Auth service latency spikes", source="auth-service", severity=Severity.SEV_2),
-            TimelineEvent(timestamp="2024-01-15T14:20:00Z", event="Cascading failures to api-gateway", source="api-gateway", severity=Severity.SEV_1),
-            TimelineEvent(timestamp="2024-01-15T14:35:00Z", event="Manual intervention to kill blocking queries", source="postgresql", severity=Severity.SEV_2),
-            TimelineEvent(timestamp="2024-01-15T14:45:00Z", event="Service recovered", source="auth-service", severity=Severity.SEV_4),
-        ],
-        action_items=[
-            ActionItem(action="Add deadlock detection and retry logic", owner="identity-team", priority=Priority.P0),
-            ActionItem(action="Review transaction ordering in user service", owner="identity-team", priority=Priority.P1),
-            ActionItem(action="Add database lock monitoring", owner="data-team", priority=Priority.P2),
-        ],
-        metadata=IncidentMetadata(
-            model="gpt-4o-mini",
-            prompt_version="1.0",
-            seed=44,
-            generated_at="2024-01-15T15:00:00Z",
-            schema_version="1.0",
-            synthetic=True,
-        ),
-    )
-
-    is_dup, dup_id, sim = controller.check_duplicate(different_incident)
-    print(f"Different incident duplicate check: {is_dup} (id: {dup_id}, similarity: {sim:.4f})")
-
-    controller.add(different_incident)
-    print(f"Stats: {controller.get_stats()}")

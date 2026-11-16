@@ -1,0 +1,378 @@
+{
+  "$defs": {
+    "ActionItem": {
+      "additionalProperties": false,
+      "description": "Action item from incident review.",
+      "properties": {
+        "action": {
+          "description": "Action description",
+          "minLength": 10,
+          "title": "Action",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Responsible team/person",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "priority": {
+          "$ref": "#/$defs/Priority",
+          "description": "Priority level"
+        }
+      },
+      "required": [
+        "action",
+        "owner",
+        "priority"
+      ],
+      "title": "ActionItem",
+      "type": "object"
+    },
+    "FailureCategory": {
+      "description": "Failure categories from the default catalog.",
+      "enum": [
+        "Connection Leak",
+        "Deadlock",
+        "Split-brain",
+        "Replication Lag",
+        "Query Timeout",
+        "Pool Exhaustion",
+        "Schema Mismatch",
+        "Vacuum Blocking",
+        "DNS Resolution Failure",
+        "Network Partition",
+        "Bandwidth Saturation",
+        "TLS Handshake Failure",
+        "Load Balancer Misconfiguration",
+        "Message Queue Backlog",
+        "Duplicate Message Processing",
+        "Poison Message",
+        "Broker Unavailable",
+        "Consumer Lag",
+        "OOMKilled",
+        "CPU Throttling",
+        "Thread Pool Exhaustion",
+        "GC Pressure",
+        "Container Restart Loop",
+        "Cache Stampede",
+        "Cache Miss Storm",
+        "Stale Cache",
+        "Cache Eviction Storm",
+        "Rollback Failure",
+        "Canary Analysis Failure",
+        "Config Drift",
+        "Dependency Conflict",
+        "Migration Failure"
+      ],
+      "title": "FailureCategory",
+      "type": "string"
+    },
+    "IncidentMetadata": {
+      "additionalProperties": false,
+      "description": "Metadata about incident generation.",
+      "properties": {
+        "model": {
+          "description": "LLM model used for generation",
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "prompt_version": {
+          "description": "Prompt template version",
+          "minLength": 1,
+          "title": "Prompt Version",
+          "type": "string"
+        },
+        "seed": {
+          "description": "Random seed used",
+          "title": "Seed",
+          "type": "integer"
+        },
+        "generated_at": {
+          "description": "Generation timestamp",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:?\\d{2})?$",
+          "title": "Generated At",
+          "type": "string"
+        },
+        "schema_version": {
+          "default": "1.0",
+          "description": "Incident schema version",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "synthetic": {
+          "default": true,
+          "description": "Always true for synthetic incidents",
+          "title": "Synthetic",
+          "type": "boolean"
+        },
+        "language": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Language"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Report language"
+        },
+        "style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Style"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Report style"
+        },
+        "generation_time_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Time taken to generate",
+          "title": "Generation Time Ms"
+        },
+        "tokens_input": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Input tokens used",
+          "title": "Tokens Input"
+        },
+        "tokens_output": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Output tokens used",
+          "title": "Tokens Output"
+        }
+      },
+      "required": [
+        "model",
+        "prompt_version",
+        "seed",
+        "generated_at"
+      ],
+      "title": "IncidentMetadata",
+      "type": "object"
+    },
+    "Language": {
+      "description": "Supported languages for incident text.",
+      "enum": [
+        "pt-BR",
+        "en"
+      ],
+      "title": "Language",
+      "type": "string"
+    },
+    "Priority": {
+      "description": "Action item priority levels.",
+      "enum": [
+        "P0",
+        "P1",
+        "P2",
+        "P3"
+      ],
+      "title": "Priority",
+      "type": "string"
+    },
+    "SLAImpact": {
+      "additionalProperties": false,
+      "description": "SLA impact metrics.",
+      "properties": {
+        "availability_before": {
+          "description": "Availability before incident",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Availability Before",
+          "type": "number"
+        },
+        "availability_after": {
+          "description": "Availability after incident",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Availability After",
+          "type": "number"
+        },
+        "p99_latency_ms": {
+          "description": "P99 latency during incident in milliseconds",
+          "exclusiveMinimum": 0,
+          "title": "P99 Latency Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "availability_before",
+        "availability_after",
+        "p99_latency_ms"
+      ],
+      "title": "SLAImpact",
+      "type": "object"
+    },
+    "Severity": {
+      "description": "Incident severity levels.",
+      "enum": [
+        "SEV-1",
+        "SEV-2",
+        "SEV-3",
+        "SEV-4"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "Style": {
+      "description": "Incident report styles.",
+      "enum": [
+        "blameless_formal",
+        "terse",
+        "detailed"
+      ],
+      "title": "Style",
+      "type": "string"
+    },
+    "TimelineEvent": {
+      "additionalProperties": false,
+      "description": "Single event in the incident timeline.",
+      "properties": {
+        "timestamp": {
+          "description": "Event timestamp in UTC",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:?\\d{2})?$",
+          "title": "Timestamp",
+          "type": "string"
+        },
+        "event": {
+          "description": "Event description",
+          "minLength": 1,
+          "title": "Event",
+          "type": "string"
+        },
+        "source": {
+          "description": "Source component/service",
+          "minLength": 1,
+          "title": "Source",
+          "type": "string"
+        },
+        "severity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Severity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Event severity if applicable"
+        }
+      },
+      "required": [
+        "timestamp",
+        "event",
+        "source"
+      ],
+      "title": "TimelineEvent",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Complete incident report.",
+  "properties": {
+    "id": {
+      "description": "Unique incident ID",
+      "pattern": "^INC-\\d{4}-\\d{4}$",
+      "title": "Id",
+      "type": "string"
+    },
+    "service": {
+      "description": "Affected service name",
+      "minLength": 1,
+      "title": "Service",
+      "type": "string"
+    },
+    "severity": {
+      "$ref": "#/$defs/Severity",
+      "description": "Incident severity"
+    },
+    "outage_duration_minutes": {
+      "description": "Outage duration in minutes",
+      "exclusiveMinimum": 0,
+      "title": "Outage Duration Minutes",
+      "type": "integer"
+    },
+    "failure_category": {
+      "$ref": "#/$defs/FailureCategory",
+      "description": "Failure category"
+    },
+    "sla_impact": {
+      "$ref": "#/$defs/SLAImpact",
+      "description": "SLA impact metrics"
+    },
+    "root_cause_analysis": {
+      "description": "Root cause analysis (min 150 chars)",
+      "minLength": 150,
+      "title": "Root Cause Analysis",
+      "type": "string"
+    },
+    "timeline": {
+      "description": "Chronological timeline (min 5 events)",
+      "items": {
+        "$ref": "#/$defs/TimelineEvent"
+      },
+      "minItems": 5,
+      "title": "Timeline",
+      "type": "array"
+    },
+    "action_items": {
+      "description": "Action items (2-8)",
+      "items": {
+        "$ref": "#/$defs/ActionItem"
+      },
+      "maxItems": 8,
+      "minItems": 2,
+      "title": "Action Items",
+      "type": "array"
+    },
+    "metadata": {
+      "$ref": "#/$defs/IncidentMetadata",
+      "description": "Generation metadata"
+    }
+  },
+  "required": [
+    "id",
+    "service",
+    "severity",
+    "outage_duration_minutes",
+    "failure_category",
+    "sla_impact",
+    "root_cause_analysis",
+    "timeline",
+    "action_items",
+    "metadata"
+  ],
+  "title": "Incident",
+  "type": "object"
+}

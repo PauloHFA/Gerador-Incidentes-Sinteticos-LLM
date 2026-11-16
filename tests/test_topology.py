@@ -1,11 +1,12 @@
 """Tests for topology loader."""
 
-import pytest
 import tempfile
 from pathlib import Path
 
+import pytest
+
+from incidentforge.models import Topology
 from incidentforge.topology import TopologyLoader
-from incidentforge.models import Topology, Service, ServiceTechnology, ServiceSLO, ServiceDependency
 
 
 class TestTopologyLoader:
@@ -14,6 +15,7 @@ class TestTopologyLoader:
     def create_sample_topology_yaml(self) -> str:
         """Create a sample topology YAML for testing."""
         import textwrap
+
         return textwrap.dedent("""\
             version: "1.0"
             services:
@@ -91,7 +93,7 @@ class TestTopologyLoader:
 
     def test_load_valid_topology(self):
         """Test loading a valid topology from YAML."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(self.create_sample_topology_yaml())
             f.flush()
             path = Path(f.name)
@@ -136,7 +138,7 @@ class TestTopologyLoader:
 
     def test_load_invalid_yaml(self):
         """Test loading invalid YAML raises ValueError."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write("invalid: yaml: [")
             f.flush()
             path = Path(f.name)
@@ -150,15 +152,16 @@ class TestTopologyLoader:
 
     def test_load_empty_yaml(self):
         """Test loading empty YAML raises ValidationError."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write("")
             f.flush()
             path = Path(f.name)
 
         try:
             loader = TopologyLoader()
-            with pytest.raises(Exception):
+            with pytest.raises((ValueError, Exception)) as exc_info:
                 loader.load(path)
+            assert exc_info.value is not None
         finally:
             path.unlink()
 
@@ -189,15 +192,16 @@ services:
     region: "us-east-1"
     replicas: 1
 """
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             f.flush()
             path = Path(f.name)
 
         try:
             loader = TopologyLoader()
-            with pytest.raises(Exception):
+            with pytest.raises((ValueError, Exception)) as exc_info:
                 loader.load(path)
+            assert exc_info.value is not None
         finally:
             path.unlink()
 
@@ -221,7 +225,7 @@ services:
     region: "us-east-1"
     replicas: 1
 """
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             f.flush()
             path = Path(f.name)
@@ -236,7 +240,7 @@ services:
     def test_strict_mode(self):
         """Test strict mode behavior."""
         # Valid topology should work in both modes
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(self.create_sample_topology_yaml())
             f.flush()
             path = Path(f.name)
@@ -254,7 +258,7 @@ services:
 
     def test_get_dependencies(self):
         """Test getting dependencies for a service."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(self.create_sample_topology_yaml())
             f.flush()
             path = Path(f.name)
@@ -280,7 +284,7 @@ services:
 
     def test_get_dependents(self):
         """Test getting services that depend on a given service."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(self.create_sample_topology_yaml())
             f.flush()
             path = Path(f.name)
@@ -307,6 +311,7 @@ services:
         """Test cycle detection."""
         # No cycles
         import textwrap
+
         yaml_no_cycle = textwrap.dedent("""\
             version: "1.0"
             services:
@@ -337,7 +342,7 @@ services:
                 region: "us-east-1"
                 replicas: 1
             """)
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_no_cycle)
             f.flush()
             path = Path(f.name)
@@ -384,7 +389,7 @@ services:
                 region: "us-east-1"
                 replicas: 1
             """)
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_cycle)
             f.flush()
             path = Path(f.name)
@@ -395,3 +400,45 @@ services:
             assert topology.has_cycles() is True
         finally:
             path.unlink()
+
+    def test_topology_validator_and_non_strict(self, tmp_path: Path):
+        """Test TopologyValidator checks and non-strict error formatting."""
+        from incidentforge.models import (
+            Service,
+            ServiceDependency,
+            ServiceSLO,
+            ServiceTechnology,
+            Topology,
+        )
+        from incidentforge.topology import TopologyValidator, load_topology
+
+        bad_file = tmp_path / "bad.yaml"
+        bad_file.write_text('version: "1.0"\nservices: []\n', encoding="utf-8")
+        with pytest.raises(ValueError, match="Topology validation failed"):
+            load_topology(bad_file, strict=False)
+
+        topo = Topology(
+            version="1.0",
+            global_slo=ServiceSLO(availability_target=0.9999, latency_p99_ms=50),
+            services=[
+                Service(
+                    name="svc-a",
+                    technology=[ServiceTechnology(name="nginx", category="network")],
+                    slo=ServiceSLO(availability_target=0.995, latency_p99_ms=200),
+                    dependencies=[
+                        ServiceDependency(target="svc-b", traffic_percentage=20.0, critical=True)
+                    ],
+                    team="core",
+                    replicas=1,
+                ),
+                Service(
+                    name="svc-b",
+                    technology=[ServiceTechnology(name="PostgreSQL", category="database")],
+                    slo=ServiceSLO(availability_target=0.9995, latency_p99_ms=40),
+                    team="data",
+                    replicas=2,
+                ),
+            ],
+        )
+        warnings = TopologyValidator.validate_all(topo)
+        assert len(warnings) >= 3

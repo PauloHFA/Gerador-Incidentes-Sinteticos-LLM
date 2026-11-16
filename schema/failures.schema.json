@@ -1,0 +1,147 @@
+{
+  "$defs": {
+    "FailureCategory": {
+      "description": "Failure categories from the default catalog.",
+      "enum": [
+        "Connection Leak",
+        "Deadlock",
+        "Split-brain",
+        "Replication Lag",
+        "Query Timeout",
+        "Pool Exhaustion",
+        "Schema Mismatch",
+        "Vacuum Blocking",
+        "DNS Resolution Failure",
+        "Network Partition",
+        "Bandwidth Saturation",
+        "TLS Handshake Failure",
+        "Load Balancer Misconfiguration",
+        "Message Queue Backlog",
+        "Duplicate Message Processing",
+        "Poison Message",
+        "Broker Unavailable",
+        "Consumer Lag",
+        "OOMKilled",
+        "CPU Throttling",
+        "Thread Pool Exhaustion",
+        "GC Pressure",
+        "Container Restart Loop",
+        "Cache Stampede",
+        "Cache Miss Storm",
+        "Stale Cache",
+        "Cache Eviction Storm",
+        "Rollback Failure",
+        "Canary Analysis Failure",
+        "Config Drift",
+        "Dependency Conflict",
+        "Migration Failure"
+      ],
+      "title": "FailureCategory",
+      "type": "string"
+    },
+    "FailureTemplate": {
+      "additionalProperties": false,
+      "description": "Failure template from the catalog.",
+      "properties": {
+        "category": {
+          "$ref": "#/$defs/FailureCategory",
+          "description": "Failure category"
+        },
+        "name": {
+          "description": "Human-readable failure name",
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "description": "Description of the failure mode",
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "applicable_technologies": {
+          "description": "List of technology names this failure applies to",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Applicable Technologies",
+          "type": "array"
+        },
+        "typical_severities": {
+          "description": "Typical severity levels for this failure",
+          "items": {
+            "$ref": "#/$defs/Severity"
+          },
+          "title": "Typical Severities",
+          "type": "array"
+        },
+        "min_duration_minutes": {
+          "default": 5,
+          "description": "Minimum outage duration",
+          "minimum": 1,
+          "title": "Min Duration Minutes",
+          "type": "integer"
+        },
+        "max_duration_minutes": {
+          "default": 240,
+          "description": "Maximum outage duration",
+          "minimum": 1,
+          "title": "Max Duration Minutes",
+          "type": "integer"
+        },
+        "tags": {
+          "description": "Additional tags for filtering",
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        }
+      },
+      "required": [
+        "category",
+        "name",
+        "description",
+        "applicable_technologies"
+      ],
+      "title": "FailureTemplate",
+      "type": "object"
+    },
+    "Severity": {
+      "description": "Incident severity levels.",
+      "enum": [
+        "SEV-1",
+        "SEV-2",
+        "SEV-3",
+        "SEV-4"
+      ],
+      "title": "Severity",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Catalog of failure templates.",
+  "properties": {
+    "version": {
+      "default": "1.0",
+      "description": "Catalog schema version",
+      "title": "Version",
+      "type": "string"
+    },
+    "failures": {
+      "description": "Failure templates (min 25)",
+      "items": {
+        "$ref": "#/$defs/FailureTemplate"
+      },
+      "minItems": 25,
+      "title": "Failures",
+      "type": "array"
+    }
+  },
+  "required": [
+    "failures"
+  ],
+  "title": "FailureCatalog",
+  "type": "object"
+}

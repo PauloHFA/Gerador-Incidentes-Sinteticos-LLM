@@ -64,11 +64,13 @@ docs = [
     "mkdocstrings[python]>=0.25.0",
 ]
 
+[project.scripts]
+incidentforge = "incidentforge.cli:app"
+
 [project.urls]
-Homepage = "https://github.com/incidentforge/incidentforge"
-Repository = "https://github.com/incidentforge/incidentforge"
-Issues = "https://github.com/incidentforge/incidentforge/issues"
-Documentation = "https://incidentforge.readthedocs.io"
+Homepage = "https://github.com/PauloHFA/IncidentForge"
+Repository = "https://github.com/PauloHFA/IncidentForge"
+Issues = "https://github.com/PauloHFA/IncidentForge/issues"
 
 [tool.uv]
 dev-dependencies = [
@@ -86,6 +88,8 @@ dev-dependencies = [
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+
+[tool.ruff.lint]
 select = [
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings
@@ -102,7 +106,10 @@ ignore = [
     "E501",  # line too long (handled by formatter)
     "B008",  # function calls in default arguments
 ]
-per-file-ignores = { "tests/*" = ["S101", "S106"] }  # allow assert and hardcoded passwords in tests
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S106", "T20"]
+"examples/*" = ["T20"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -110,7 +117,7 @@ indent-style = "space"
 skip-magic-trailing-comma = false
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
@@ -123,6 +130,10 @@ warn_unused_ignores = true
 warn_no_return = true
 implicit_reexport = true
 enable_error_code = ["ignore-without-code"]
+
+[[tool.mypy.overrides]]
+module = ["yaml.*", "datasketch.*", "sentence_transformers.*", "pandas.*", "pyarrow.*", "aiofiles.*"]
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "tests.*"

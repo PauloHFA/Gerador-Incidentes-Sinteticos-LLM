@@ -1,9 +1,10 @@
 """Tests for CLI commands."""
 
-import pytest
-import tempfile
 import json
+import tempfile
 from pathlib import Path
+
+import pytest
 from typer.testing import CliRunner
 
 from incidentforge.cli import app
@@ -70,6 +71,7 @@ class TestCLI:
 
             # Copy sample files
             import shutil
+
             sample_topology = Path("configs/topology_sample.yaml")
             sample_failures = Path("configs/failures_default.yaml")
             if sample_topology.exists():
@@ -77,13 +79,20 @@ class TestCLI:
             if sample_failures.exists():
                 shutil.copy2(sample_failures, configs_dir / "failures.yaml")
 
-            result = self.runner.invoke(app, [
-                "plan",
-                "--topology", str(configs_dir / "topology.yaml"),
-                "--failures", str(configs_dir / "failures.yaml"),
-                "--per-service", "1",
-                "--seed", "42",
-            ])
+            result = self.runner.invoke(
+                app,
+                [
+                    "plan",
+                    "--topology",
+                    str(configs_dir / "topology.yaml"),
+                    "--failures",
+                    str(configs_dir / "failures.yaml"),
+                    "--per-service",
+                    "1",
+                    "--seed",
+                    "42",
+                ],
+            )
             assert result.exit_code == 0
             assert "Generation Plan" in result.output
             assert "Total Tasks:" in result.output
@@ -95,6 +104,7 @@ class TestCLI:
             configs_dir.mkdir(parents=True)
 
             import shutil
+
             sample_topology = Path("configs/topology_sample.yaml")
             sample_failures = Path("configs/failures_default.yaml")
             if sample_topology.exists():
@@ -102,12 +112,17 @@ class TestCLI:
             if sample_failures.exists():
                 shutil.copy2(sample_failures, configs_dir / "failures.yaml")
 
-            result = self.runner.invoke(app, [
-                "plan",
-                "--topology", str(configs_dir / "topology.yaml"),
-                "--failures", str(configs_dir / "failures.yaml"),
-                "--dry-run",
-            ])
+            result = self.runner.invoke(
+                app,
+                [
+                    "plan",
+                    "--topology",
+                    str(configs_dir / "topology.yaml"),
+                    "--failures",
+                    str(configs_dir / "failures.yaml"),
+                    "--dry-run",
+                ],
+            )
             assert result.exit_code == 0
             assert "Dry run complete" in result.output
 
@@ -118,6 +133,7 @@ class TestCLI:
             configs_dir.mkdir(parents=True)
 
             import shutil
+
             sample_topology = Path("configs/topology_sample.yaml")
             sample_failures = Path("configs/failures_default.yaml")
             if sample_topology.exists():
@@ -126,12 +142,18 @@ class TestCLI:
                 shutil.copy2(sample_failures, configs_dir / "failures.yaml")
 
             output_file = Path(tmpdir) / "plan.json"
-            result = self.runner.invoke(app, [
-                "plan",
-                "--topology", str(configs_dir / "topology.yaml"),
-                "--failures", str(configs_dir / "failures.yaml"),
-                "--output", str(output_file),
-            ])
+            result = self.runner.invoke(
+                app,
+                [
+                    "plan",
+                    "--topology",
+                    str(configs_dir / "topology.yaml"),
+                    "--failures",
+                    str(configs_dir / "failures.yaml"),
+                    "--output",
+                    str(output_file),
+                ],
+            )
             assert result.exit_code == 0
             assert output_file.exists()
 
@@ -164,12 +186,23 @@ class TestCLI:
             assert schema["type"] == "object"
 
     def test_generate_command_missing_config(self):
-            """Test generate command with missing config files."""
-            runner = CliRunner()
-            # Use non-existent config files
-            result = runner.invoke(app, ["generate", "--topology", "nonexistent.yaml", "--failures", "nonexistent.yaml", "--concurrency", "0"])
-            assert result.exit_code != 0
-            assert "Error loading configuration" in result.output
+        """Test generate command with missing config files."""
+        runner = CliRunner()
+        # Use non-existent config files
+        result = runner.invoke(
+            app,
+            [
+                "generate",
+                "--topology",
+                "nonexistent.yaml",
+                "--failures",
+                "nonexistent.yaml",
+                "--concurrency",
+                "0",
+            ],
+        )
+        assert result.exit_code != 0
+        assert "Error loading configuration" in result.output
 
     def test_validate_command_no_files(self):
         """Test validate command with no incident files."""
@@ -198,6 +231,171 @@ class TestCLI:
             result = self.runner.invoke(app, ["report", tmpdir])
             assert result.exit_code != 0
             assert "No JSONL files found" in result.output
+
+    def test_generate_dry_run_command(self, tmp_path: Path):
+        """Test generate --dry-run runs planner and outputs token estimate."""
+        result = self.runner.invoke(
+            app,
+            [
+                "generate",
+                "--topology",
+                "configs/topology_sample.yaml",
+                "--failures",
+                "configs/failures_default.yaml",
+                "--count",
+                "4",
+                "--dry-run",
+                "--output",
+                str(tmp_path / "out"),
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Dry run: 4 tasks planned" in result.output
+        assert "Estimated tokens:" in result.output
+
+    def test_generate_and_downstream_cli_commands(
+        self, tmp_path: Path, valid_incident, monkeypatch
+    ):
+        """Test generate exports files, then validate/dedup/export/report work on them."""
+        from incidentforge.generator import IncidentGenerator
+
+        inc1 = valid_incident.model_copy(deep=True)
+        inc2 = valid_incident.model_copy(deep=True)
+        inc2.id = "INC-2024-0002"
+
+        async def fake_generate(self):
+            return [inc1, inc2]
+
+        monkeypatch.setattr(IncidentGenerator, "generate", fake_generate)
+
+        out_dir = tmp_path / "out"
+        res_gen = self.runner.invoke(
+            app,
+            [
+                "generate",
+                "--topology",
+                "configs/topology_sample.yaml",
+                "--failures",
+                "configs/failures_default.yaml",
+                "--count",
+                "2",
+                "--output",
+                str(out_dir),
+                "--formats",
+                "jsonl,markdown",
+            ],
+        )
+        assert res_gen.exit_code == 0
+        jsonl_file = out_dir / "incidents_dataset.jsonl"
+        assert jsonl_file.exists()
+        assert (out_dir / "markdown" / "INC-2024-0001.md").exists()
+
+        # validate single JSONL file with --schema-only and full validation
+        val_report = tmp_path / "val.json"
+        res_val = self.runner.invoke(
+            app,
+            [
+                "validate",
+                str(jsonl_file),
+                "--topology",
+                "configs/topology_sample.yaml",
+                "--output",
+                str(val_report),
+            ],
+        )
+        assert res_val.exit_code == 0
+        assert val_report.exists()
+
+        res_val_schema = self.runner.invoke(app, ["validate", str(jsonl_file), "--schema-only"])
+        assert res_val_schema.exit_code == 0
+
+        # dedup without embeddings
+        dedup_dir = tmp_path / "dedup"
+        res_dedup = self.runner.invoke(
+            app,
+            [
+                "dedup",
+                str(jsonl_file),
+                "--output",
+                str(dedup_dir),
+                "--no-embeddings",
+            ],
+        )
+        assert res_dedup.exit_code == 0
+        assert (dedup_dir / "incidents_dataset.jsonl").exists()
+
+        # export
+        export_dir = tmp_path / "export"
+        res_export = self.runner.invoke(
+            app,
+            [
+                "export",
+                str(jsonl_file),
+                "--output",
+                str(export_dir),
+                "--formats",
+                "jsonl,markdown",
+            ],
+        )
+        assert res_export.exit_code == 0
+
+        # report
+        rep_dir = tmp_path / "reports"
+        res_rep = self.runner.invoke(
+            app,
+            [
+                "report",
+                str(jsonl_file),
+                "--output",
+                str(rep_dir),
+                "--topology",
+                "configs/topology_sample.yaml",
+            ],
+        )
+        assert res_rep.exit_code == 0
+        assert (rep_dir / "quality_report.md").exists()
+        assert (rep_dir / "quality_report.json").exists()
+        assert (rep_dir / "DATASET_CARD.md").exists()
+
+    def test_judge_command_mocked(self, tmp_path: Path, valid_incident, monkeypatch):
+        """Test judge CLI command with mocked LLM client."""
+        from incidentforge.client import LLMClient, LLMResponse
+
+        jsonl_file = tmp_path / "data.jsonl"
+        jsonl_file.write_text(valid_incident.model_dump_json() + "\n", encoding="utf-8")
+        out_json = tmp_path / "judge.json"
+
+        class DummyJudgeClient(LLMClient):
+            async def generate(self, prompt, system_prompt=None, response_format=None, **kwargs):
+                return LLMResponse(
+                    content=json.dumps(
+                        {
+                            "technical_realism": 5,
+                            "causal_coherence": 4,
+                            "actionability": 5,
+                            "completeness": 5,
+                            "consistency": 5,
+                            "overall": 4.8,
+                            "feedback": "Solid synthetic report",
+                        }
+                    )
+                )
+
+            async def generate_structured(self, prompt, system_prompt, schema, **kwargs):
+                return await self.generate(prompt, system_prompt)
+
+            async def close(self):
+                pass
+
+        monkeypatch.setattr("incidentforge.cli.create_llm_client", lambda cfg: DummyJudgeClient())
+
+        res = self.runner.invoke(
+            app,
+            ["judge", str(jsonl_file), "--sample", "1", "--output", str(out_json)],
+        )
+        assert res.exit_code == 0
+        assert "avg overall: 4.80/5" in res.output
+        assert out_json.exists()
 
 
 if __name__ == "__main__":

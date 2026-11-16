@@ -7,13 +7,13 @@ import os
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, AsyncIterator, Optional
+from typing import Any
 
 import httpx
 from openai import AsyncOpenAI
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
-from .models import Incident, GenerationTask
+from .models import GenerationTask, Incident
 
 
 @dataclass
@@ -29,6 +29,7 @@ class LLMConfig:
     top_p: float = 0.95
     max_tokens: int = 4000
     use_structured_output: bool = True  # Use response_format if supported
+    use_httpx: bool = False
 
 
 class LLMResponse(BaseModel):
@@ -48,8 +49,8 @@ class LLMClient(ABC):
         self,
         prompt: str,
         system_prompt: str | None = None,
-        response_format: dict | None = None,
-        **kwargs
+        response_format: dict[str, Any] | None = None,
+        **kwargs: Any,
     ) -> LLMResponse:
         """Generate a response from the LLM."""
         pass
@@ -59,8 +60,8 @@ class LLMClient(ABC):
         self,
         prompt: str,
         system_prompt: str | None,
-        schema: dict,
-        **kwargs
+        schema: dict[str, Any],
+        **kwargs: Any,
     ) -> LLMResponse:
         """Generate a structured response conforming to JSON schema."""
         pass
@@ -82,11 +83,15 @@ class OpenAICompatibleClient(LLMClient):
     def client(self) -> AsyncOpenAI:
         """Lazy-initialize the client."""
         if self._client is None:
-            api_key = self.config.api_key or os.getenv("OPENAI_API_KEY")
+            api_key = (
+                self.config.api_key
+                or os.getenv("INCIDENTFORGE_API_KEY")
+                or os.getenv("OPENAI_API_KEY")
+            )
             if not api_key:
                 raise ValueError(
-                    "API key not provided. Set OPENAI_API_KEY environment variable "
-                    "or pass api_key in config."
+                    "API key not provided. Set INCIDENTFORGE_API_KEY or OPENAI_API_KEY "
+                    "environment variable or pass api_key in config."
                 )
             self._client = AsyncOpenAI(
                 base_url=self.config.base_url,
@@ -100,16 +105,16 @@ class OpenAICompatibleClient(LLMClient):
         self,
         prompt: str,
         system_prompt: str | None = None,
-        response_format: dict | None = None,
-        **kwargs
+        response_format: dict[str, Any] | None = None,
+        **kwargs: Any,
     ) -> LLMResponse:
         """Generate a response from the LLM."""
-        messages = []
+        messages: list[dict[str, str]] = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
-        params = {
+        params: dict[str, Any] = {
             "model": self.config.model,
             "messages": messages,
             "temperature": kwargs.get("temperature", self.config.temperature),
@@ -142,8 +147,8 @@ class OpenAICompatibleClient(LLMClient):
         self,
         prompt: str,
         system_prompt: str | None,
-        schema: dict,
-        **kwargs
+        schema: dict[str, Any],
+        **kwargs: Any,
     ) -> LLMResponse:
         """Generate a structured response using JSON schema."""
         response_format = {
@@ -158,7 +163,7 @@ class OpenAICompatibleClient(LLMClient):
             prompt=prompt,
             system_prompt=system_prompt,
             response_format=response_format,
-            **kwargs
+            **kwargs,
         )
 
     async def close(self) -> None:
@@ -179,7 +184,11 @@ class HTTPXClient(LLMClient):
     def client(self) -> httpx.AsyncClient:
         """Lazy-initialize the client."""
         if self._client is None:
-            api_key = self.config.api_key or os.getenv("OPENAI_API_KEY")
+            api_key = (
+                self.config.api_key
+                or os.getenv("INCIDENTFORGE_API_KEY")
+                or os.getenv("OPENAI_API_KEY")
+            )
             headers = {"Content-Type": "application/json"}
             if api_key:
                 headers["Authorization"] = f"Bearer {api_key}"
@@ -194,16 +203,16 @@ class HTTPXClient(LLMClient):
         self,
         prompt: str,
         system_prompt: str | None = None,
-        response_format: dict | None = None,
-        **kwargs
+        response_format: dict[str, Any] | None = None,
+        **kwargs: Any,
     ) -> LLMResponse:
         """Generate a response using raw HTTP."""
-        messages = []
+        messages: list[dict[str, str]] = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
-        payload = {
+        payload: dict[str, Any] = {
             "model": self.config.model,
             "messages": messages,
             "temperature": kwargs.get("temperature", self.config.temperature),
@@ -233,8 +242,8 @@ class HTTPXClient(LLMClient):
         self,
         prompt: str,
         system_prompt: str | None,
-        schema: dict,
-        **kwargs
+        schema: dict[str, Any],
+        **kwargs: Any,
     ) -> LLMResponse:
         """Generate structured response with JSON schema."""
         response_format = {
@@ -249,7 +258,7 @@ class HTTPXClient(LLMClient):
             prompt=prompt,
             system_prompt=system_prompt,
             response_format=response_format,
-            **kwargs
+            **kwargs,
         )
 
     async def close(self) -> None:
@@ -263,49 +272,33 @@ class TolerantJSONParser:
     """Parse JSON from LLM responses tolerantly."""
 
     @staticmethod
-    def extract_json(text: str) -> dict | None:
-        """
-        Extract JSON from text, handling code fences and extra text.
-
-        Args:
-            text: Raw text from LLM.
-
-        Returns:
-            Parsed JSON dict or None if extraction fails.
-        """
-        # Try direct parse first
+    def extract_json(text: str) -> dict[str, Any] | None:
+        """Extract JSON object from text, handling code fences and extra text."""
         try:
-            return json.loads(text)
+            loaded = json.loads(text)
+            if isinstance(loaded, dict):
+                return loaded
         except json.JSONDecodeError:
             pass
 
-        # Try to find JSON in code fences
         code_fence_pattern = r"```(?:json)?\s*(\{.*?\})\s*```"
         matches = re.findall(code_fence_pattern, text, re.DOTALL)
         for match in matches:
             try:
-                return json.loads(match)
+                loaded = json.loads(match)
+                if isinstance(loaded, dict):
+                    return loaded
             except json.JSONDecodeError:
                 continue
 
-        # Try to find JSON object in text
-        # Look for first { and last }
         start = text.find("{")
         end = text.rfind("}")
         if start != -1 and end != -1 and end > start:
-            candidate = text[start:end + 1]
+            candidate = text[start : end + 1]
             try:
-                return json.loads(candidate)
-            except json.JSONDecodeError:
-                pass
-
-        # Try to find JSON array
-        start = text.find("[")
-        end = text.rfind("]")
-        if start != -1 and end != -1 and end > start:
-            candidate = text[start:end + 1]
-            try:
-                return json.loads(candidate)
+                loaded = json.loads(candidate)
+                if isinstance(loaded, dict):
+                    return loaded
             except json.JSONDecodeError:
                 pass
 
@@ -342,7 +335,8 @@ def create_llm_client(config: LLMConfig) -> LLMClient:
     Returns:
         LLMClient instance.
     """
-    # Use OpenAI SDK for OpenAI-compatible endpoints
+    if config.use_httpx:
+        return HTTPXClient(config)
     return OpenAICompatibleClient(config)
 
 
@@ -351,7 +345,7 @@ async def generate_incident(
     task: GenerationTask,
     prompt: str,
     system_prompt: str | None,
-    schema: dict,
+    schema: dict[str, Any],
     use_structured: bool = True,
 ) -> tuple[Incident | None, LLMResponse | None, str | None]:
     """
@@ -370,18 +364,28 @@ async def generate_incident(
     """
     try:
         if use_structured:
-            response = await client.generate_structured(
-                prompt=prompt,
-                system_prompt=system_prompt,
-                schema=schema,
-            )
+            try:
+                response = await client.generate_structured(
+                    prompt=prompt,
+                    system_prompt=system_prompt,
+                    schema=schema,
+                )
+            except Exception as exc:
+                # Fallback to unstructured generation only when endpoint rejects response_format
+                msg = str(exc).lower()
+                if "response_format" in msg or "json_schema" in msg:
+                    response = await client.generate(
+                        prompt=prompt,
+                        system_prompt=system_prompt,
+                    )
+                else:
+                    raise
         else:
             response = await client.generate(
                 prompt=prompt,
                 system_prompt=system_prompt,
             )
 
-        # Parse response
         incident = TolerantJSONParser.parse_incident(response.content)
         if incident is None:
             return None, response, "Failed to parse JSON from response"
@@ -390,26 +394,3 @@ async def generate_incident(
 
     except Exception as e:
         return None, None, str(e)
-
-
-if __name__ == "__main__":
-    import asyncio
-
-    async def test():
-        config = LLMConfig(
-            base_url="https://api.openai.com/v1",
-            model="gpt-4o-mini",
-        )
-        client = create_llm_client(config)
-
-        try:
-            response = await client.generate(
-                prompt="Say hello in JSON format with a 'message' field",
-                system_prompt="You are a helpful assistant that responds in JSON.",
-            )
-            print(f"Response: {response.content}")
-            print(f"Usage: {response.usage}")
-        finally:
-            await client.close()
-
-    asyncio.run(test())

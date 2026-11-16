@@ -1,11 +1,21 @@
 """Tests for task planner."""
 
 import pytest
-from incidentforge.planner import TaskPlanner, PlannerConfig, build_generation_plan
+
 from incidentforge.models import (
-    Topology, Service, ServiceTechnology, ServiceSLO, ServiceDependency,
-    FailureCatalog, FailureTemplate, FailureCategory, Severity, Style, Language, ArchitectureProfile
+    ArchitectureProfile,
+    FailureCatalog,
+    FailureCategory,
+    Language,
+    Service,
+    ServiceDependency,
+    ServiceSLO,
+    ServiceTechnology,
+    Severity,
+    Style,
+    Topology,
 )
+from incidentforge.planner import PlannerConfig, TaskPlanner, build_generation_plan
 
 
 def create_sample_topology() -> Topology:
@@ -53,7 +63,10 @@ def create_sample_topology() -> Topology:
 def create_sample_catalog() -> FailureCatalog:
     """Create a sample failure catalog for testing."""
     from incidentforge.failures import load_failure_catalog
+
     return load_failure_catalog()
+
+
 class TestPlannerConfig:
     """Tests for PlannerConfig."""
 
@@ -128,7 +141,7 @@ class TestTaskPlanner:
 
         # Same seed should produce identical tasks
         assert len(plan1.tasks) == len(plan2.tasks)
-        for t1, t2 in zip(plan1.tasks, plan2.tasks):
+        for t1, t2 in zip(plan1.tasks, plan2.tasks, strict=True):
             assert t1.service_name == t2.service_name
             assert t1.failure_category == t2.failure_category
             assert t1.severity == t2.severity
@@ -148,8 +161,12 @@ class TestTaskPlanner:
 
         # Different seeds should produce different task orders
         # (though they might have same combinations, order should differ)
-        task_keys_1 = [(t.service_name, t.failure_category.value, t.severity.value) for t in plan1.tasks]
-        task_keys_2 = [(t.service_name, t.failure_category.value, t.severity.value) for t in plan2.tasks]
+        task_keys_1 = [
+            (t.service_name, t.failure_category.value, t.severity.value) for t in plan1.tasks
+        ]
+        task_keys_2 = [
+            (t.service_name, t.failure_category.value, t.severity.value) for t in plan2.tasks
+        ]
 
         # At least the order should be different
         assert task_keys_1 != task_keys_2
@@ -217,7 +234,9 @@ class TestTaskPlanner:
         auth_service_tasks = [t for t in plan.tasks if t.service_name == "auth-service"]
         categories = {t.failure_category for t in auth_service_tasks}
         # Should have PostgreSQL and Redis compatible failures
-        assert FailureCategory.CONNECTION_LEAK in categories or FailureCategory.DEADLOCK in categories
+        assert (
+            FailureCategory.CONNECTION_LEAK in categories or FailureCategory.DEADLOCK in categories
+        )
         assert FailureCategory.CACHE_STAMPEDE in categories
 
     def test_build_generation_plan_convenience(self):
@@ -236,10 +255,9 @@ class TestTaskPlanner:
 
     def test_empty_catalog_raises_error(self):
         """Test that empty catalog raises error."""
-        topology = create_sample_topology()
+        create_sample_topology()
         # Can't construct FailureCatalog with 0 failures (min is 25) so use a catalog
         # with failures that don't match any service technology
-        from incidentforge.failures import load_failure_catalog
         # Use the real catalog but expect no combinations for an incompatible topology
         pass  # Covered by test_incompatible_technologies_raises_error
 

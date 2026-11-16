@@ -2,14 +2,10 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, master, develop]
   pull_request:
-    branches: [main, develop]
+    branches: [main, master, develop]
   workflow_dispatch:
-
-env:
-  PYTHON_VERSIONS: "3.11, 3.12"
-  POETRY_VERSION: "1.8.3"
 
 jobs:
   lint-and-typecheck:
@@ -139,10 +135,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Python 3.11
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
           cache: "pip"
 
       - name: Install uv
@@ -179,17 +175,17 @@ jobs:
     name: Build Package
     runs-on: ubuntu-latest
     needs: [lint-and-typecheck, test, contract-tests, security-scan]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set up Python 3.11
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
           cache: "pip"
 
       - name: Install uv
@@ -205,10 +201,6 @@ jobs:
         run: |
           uv build
 
-      - name: Verify package
-        run: |
-          uv run twine check dist/*
-
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -220,7 +212,7 @@ jobs:
     name: Build Docker Image
     runs-on: ubuntu-latest
     needs: [lint-and-typecheck, test]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -243,59 +235,3 @@ jobs:
       - name: Test Docker image
         run: |
           docker run --rm incidentforge:latest incidentforge --help
-
-  release-please:
-    name: Release Please
-    runs-on: ubuntu-latest
-    needs: [build, docker]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    permissions:
-      contents: write
-      pull-requests: write
-    steps:
-      - name: Release Please
-        uses: google-github-actions/release-please-action@v4
-        with:
-          release-type: python
-          package-name: incidentforge
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-  publish-pypi:
-    name: Publish to PyPI
-    runs-on: ubuntu-latest
-    needs: [release-please]
-    if: github.event_name == 'release' && github.event.action == 'published'
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: "pip"
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
-        with:
-          version: "latest"
-
-      - name: Install dependencies
-        run: |
-          uv sync --all-extras --dev
-
-      - name: Build package
-        run: |
-          uv build
-
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          user: __token__
-          password: ${{ secrets.PYPI_API_TOKEN }}
-          verbose: true

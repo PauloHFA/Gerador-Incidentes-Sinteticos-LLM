@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-import re
-from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Annotated, Any, Literal
-from uuid import UUID, uuid4
 
 from pydantic import (
     BaseModel,
@@ -16,11 +13,9 @@ from pydantic import (
     field_validator,
     model_validator,
 )
-from pydantic.json_schema import GenerateJsonSchema
-from pydantic_core import core_schema
 
 
-class Severity(str, Enum):
+class Severity(StrEnum):
     """Incident severity levels."""
 
     SEV_1 = "SEV-1"
@@ -29,7 +24,7 @@ class Severity(str, Enum):
     SEV_4 = "SEV-4"
 
 
-class Priority(str, Enum):
+class Priority(StrEnum):
     """Action item priority levels."""
 
     P0 = "P0"
@@ -38,7 +33,7 @@ class Priority(str, Enum):
     P3 = "P3"
 
 
-class ArchitectureProfile(str, Enum):
+class ArchitectureProfile(StrEnum):
     """System architecture profiles."""
 
     MICROSERVICES = "microservices"
@@ -46,14 +41,14 @@ class ArchitectureProfile(str, Enum):
     SERVERLESS = "serverless"
 
 
-class Language(str, Enum):
+class Language(StrEnum):
     """Supported languages for incident text."""
 
     PT_BR = "pt-BR"
     EN = "en"
 
 
-class Style(str, Enum):
+class Style(StrEnum):
     """Incident report styles."""
 
     BLAMELESS_FORMAL = "blameless_formal"
@@ -61,7 +56,7 @@ class Style(str, Enum):
     DETAILED = "detailed"
 
 
-class FailureCategory(str, Enum):
+class FailureCategory(StrEnum):
     """Failure categories from the default catalog."""
 
     # Database
@@ -118,7 +113,9 @@ IncidentID = Annotated[
 
 ISO8601DateTime = Annotated[
     str,
-    StringConstraints(pattern=r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$"),
+    StringConstraints(
+        pattern=r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$"
+    ),
     Field(description="ISO 8601 datetime in UTC"),
 ]
 
@@ -134,7 +131,9 @@ class ServiceTechnology(BaseModel):
 
     name: NonEmptyStr = Field(description="Technology name (e.g., PostgreSQL, Redis, Kafka)")
     version: str | None = Field(default=None, description="Version if applicable")
-    category: NonEmptyStr = Field(description="Category: database, cache, messaging, compute, network, deploy")
+    category: NonEmptyStr = Field(
+        description="Category: database, cache, messaging, compute, network, deploy"
+    )
 
 
 class ServiceSLO(BaseModel):
@@ -142,9 +141,13 @@ class ServiceSLO(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    availability_target: float = Field(ge=0.0, le=1.0, description="Availability target (e.g., 0.9995)")
+    availability_target: float = Field(
+        ge=0.0, le=1.0, description="Availability target (e.g., 0.9995)"
+    )
     latency_p99_ms: int = Field(gt=0, description="P99 latency target in milliseconds")
-    throughput_rps: int | None = Field(default=None, ge=0, description="Target throughput in requests per second")
+    throughput_rps: int | None = Field(
+        default=None, ge=0, description="Target throughput in requests per second"
+    )
 
 
 class ServiceDependency(BaseModel):
@@ -153,8 +156,12 @@ class ServiceDependency(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     target: NonEmptyStr = Field(description="Target service name")
-    traffic_percentage: float = Field(ge=0.0, le=100.0, description="Percentage of traffic to this dependency")
-    critical: bool = Field(default=True, description="Whether this dependency is critical for availability")
+    traffic_percentage: float = Field(
+        ge=0.0, le=100.0, description="Percentage of traffic to this dependency"
+    )
+    critical: bool = Field(
+        default=True, description="Whether this dependency is critical for availability"
+    )
 
 
 class Service(BaseModel):
@@ -165,7 +172,9 @@ class Service(BaseModel):
     name: NonEmptyStr = Field(description="Unique service name")
     technology: list[ServiceTechnology] = Field(min_length=1, description="Technology stack")
     slo: ServiceSLO = Field(description="Service Level Objectives")
-    dependencies: list[ServiceDependency] = Field(default_factory=list, description="Downstream dependencies")
+    dependencies: list[ServiceDependency] = Field(
+        default_factory=list, description="Downstream dependencies"
+    )
     team: NonEmptyStr = Field(description="Owning team name")
     region: NonEmptyStr = Field(default="us-east-1", description="Deployment region")
     replicas: int = Field(default=3, ge=1, description="Number of replicas")
@@ -180,7 +189,9 @@ class Topology(BaseModel):
 
     version: str = Field(default="1.0", description="Topology schema version")
     services: list[Service] = Field(min_length=1, description="List of services")
-    global_slo: ServiceSLO | None = Field(default=None, description="Global SLO overriding service SLOs")
+    global_slo: ServiceSLO | None = Field(
+        default=None, description="Global SLO overriding service SLOs"
+    )
     metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
     @field_validator("services", mode="after")
@@ -271,9 +282,10 @@ class FailureCatalog(BaseModel):
 
     def get_applicable_failures(self, technologies: list[str]) -> list[FailureTemplate]:
         """Get failures applicable to the given technologies."""
-        tech_set = set(t.lower() for t in technologies)
+        tech_set = {t.lower() for t in technologies}
         return [
-            f for f in self.failures
+            f
+            for f in self.failures
             if any(t.lower() in tech_set for t in f.applicable_technologies)
         ]
 
@@ -281,7 +293,7 @@ class FailureCatalog(BaseModel):
         """Get failure template by category."""
         return next((f for f in self.failures if f.category == category), None)
 
-    def merge(self, other: "FailureCatalog", mode: str = "extend") -> "FailureCatalog":
+    def merge(self, other: FailureCatalog, mode: str = "extend") -> FailureCatalog:
         """Merge with another catalog.
 
         Args:
@@ -300,6 +312,7 @@ class FailureCatalog(BaseModel):
                 if failure.category not in existing_categories:
                     merged_failures.append(failure)
         return FailureCatalog(version=self.version, failures=merged_failures)
+
 
 class TimelineEvent(BaseModel):
     """Single event in the incident timeline."""
@@ -343,6 +356,8 @@ class IncidentMetadata(BaseModel):
     generated_at: ISO8601DateTime = Field(description="Generation timestamp")
     schema_version: str = Field(default="1.0", description="Incident schema version")
     synthetic: bool = Field(default=True, description="Always true for synthetic incidents")
+    language: Language | None = Field(default=None, description="Report language")
+    style: Style | None = Field(default=None, description="Report style")
     generation_time_ms: int | None = Field(default=None, description="Time taken to generate")
     tokens_input: int | None = Field(default=None, description="Input tokens used")
     tokens_output: int | None = Field(default=None, description="Output tokens used")
@@ -360,11 +375,13 @@ class Incident(BaseModel):
     failure_category: FailureCategory = Field(description="Failure category")
     sla_impact: SLAImpact = Field(description="SLA impact metrics")
     root_cause_analysis: RootCauseStr = Field(description="Root cause analysis (min 150 chars)")
-    timeline: list[TimelineEvent] = Field(min_length=5, description="Chronological timeline (min 5 events)")
-    action_items: list[ActionItem] = Field(min_length=2, max_length=8, description="Action items (2-8)")
+    timeline: list[TimelineEvent] = Field(
+        min_length=5, description="Chronological timeline (min 5 events)"
+    )
+    action_items: list[ActionItem] = Field(
+        min_length=2, max_length=8, description="Action items (2-8)"
+    )
     metadata: IncidentMetadata = Field(description="Generation metadata")
-
-
 
     @model_validator(mode="after")
     def validate_root_cause_mentions_technology(self) -> Incident:
@@ -426,14 +443,8 @@ class RejectedIncident(BaseModel):
 def export_json_schema(model_class: type[BaseModel], output_path: str) -> None:
     """Export JSON schema for a model."""
     import json
+    from pathlib import Path
+
     schema = model_class.model_json_schema()
-    with open(output_path, "w", encoding="utf-8") as f:
+    with Path(output_path).open("w", encoding="utf-8") as f:
         json.dump(schema, f, indent=2, ensure_ascii=False)
-
-
-if __name__ == "__main__":
-    # Export schemas when run directly
-    export_json_schema(Topology, "schema/topology.schema.json")
-    export_json_schema(FailureCatalog, "schema/failures.schema.json")
-    export_json_schema(Incident, "schema/incident.schema.json")
-    print("Schemas exported to schema/")

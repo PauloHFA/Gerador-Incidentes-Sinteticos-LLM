@@ -1,15 +1,22 @@
 """Tests for deduplication."""
 
 import pytest
+
 from incidentforge.dedup import (
     DedupConfig,
+    DiversityController,
     EmbeddingDeduplicator,
     MinHashDeduplicator,
-    DiversityController,
 )
 from incidentforge.models import (
-    Incident, TimelineEvent, SLAImpact, ActionItem, IncidentMetadata,
-    Severity, FailureCategory, Priority
+    ActionItem,
+    FailureCategory,
+    Incident,
+    IncidentMetadata,
+    Priority,
+    Severity,
+    SLAImpact,
+    TimelineEvent,
 )
 
 
@@ -22,8 +29,12 @@ def create_incident(
     """Create a test incident."""
     # Ensure root_cause is at least 150 characters
     if len(root_cause) < 150:
-        root_cause = root_cause + " " + "This is a detailed root cause analysis that explains the underlying technical issues that led to the incident. The investigation revealed multiple contributing factors including configuration issues, resource constraints, and monitoring gaps that need to be addressed to prevent recurrence."
-    
+        root_cause = (
+            root_cause
+            + " "
+            + "This is a detailed root cause analysis that explains the underlying technical issues that led to the incident. The investigation revealed multiple contributing factors including configuration issues, resource constraints, and monitoring gaps that need to be addressed to prevent recurrence."
+        )
+
     return Incident(
         id=incident_id,
         service=service,

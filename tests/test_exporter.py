@@ -1,20 +1,27 @@
 """Tests for exporters."""
 
-import pytest
-import tempfile
 import json
+import tempfile
 from pathlib import Path
 
+import pytest
+
 from incidentforge.exporter import (
-    MarkdownExporter,
-    JSONLExporter,
-    ParquetExporter,
     ExporterManager,
+    JSONLExporter,
+    MarkdownExporter,
+    ParquetExporter,
     export_incidents,
 )
 from incidentforge.models import (
-    Incident, TimelineEvent, SLAImpact, ActionItem, IncidentMetadata,
-    Severity, FailureCategory, Priority
+    ActionItem,
+    FailureCategory,
+    Incident,
+    IncidentMetadata,
+    Priority,
+    Severity,
+    SLAImpact,
+    TimelineEvent,
 )
 
 
@@ -35,13 +42,23 @@ def create_test_incidents() -> list[Incident]:
             root_cause_analysis="A connection leak in the nginx upstream module caused pool exhaustion. The investigation revealed that the connection pool was not properly releasing connections back to the pool after requests completed, leading to gradual exhaustion of available connections. This was compounded by a lack of proper timeout configuration and monitoring alerts that would have detected the issue earlier.",
             timeline=[
                 TimelineEvent(timestamp="2024-01-15T10:00:00Z", event="Event 1", source="nginx"),
-                TimelineEvent(timestamp="2024-01-15T10:05:00Z", event="Event 2", source="api-gateway"),
-                TimelineEvent(timestamp="2024-01-15T10:15:00Z", event="Event 3", source="api-gateway"),
-                TimelineEvent(timestamp="2024-01-15T10:25:00Z", event="Event 4", source="kubernetes"),
-                TimelineEvent(timestamp="2024-01-15T10:30:00Z", event="Event 5", source="api-gateway"),
+                TimelineEvent(
+                    timestamp="2024-01-15T10:05:00Z", event="Event 2", source="api-gateway"
+                ),
+                TimelineEvent(
+                    timestamp="2024-01-15T10:15:00Z", event="Event 3", source="api-gateway"
+                ),
+                TimelineEvent(
+                    timestamp="2024-01-15T10:25:00Z", event="Event 4", source="kubernetes"
+                ),
+                TimelineEvent(
+                    timestamp="2024-01-15T10:30:00Z", event="Event 5", source="api-gateway"
+                ),
             ],
             action_items=[
-                ActionItem(action="Fix connection leak", owner="platform-team", priority=Priority.P0),
+                ActionItem(
+                    action="Fix connection leak", owner="platform-team", priority=Priority.P0
+                ),
                 ActionItem(action="Add monitoring", owner="platform-team", priority=Priority.P1),
             ],
             metadata=IncidentMetadata(
@@ -66,16 +83,28 @@ def create_test_incidents() -> list[Incident]:
             ),
             root_cause_analysis="A deadlock in PostgreSQL caused transaction failures. The investigation revealed that concurrent transactions were acquiring locks in different orders, creating a circular wait condition. The application was not using consistent lock ordering, and the database isolation level was not configured to prevent this scenario. Proper indexing and query optimization could have reduced lock contention.",
             timeline=[
-                TimelineEvent(timestamp="2024-01-15T14:00:00Z", event="Event 1", source="postgresql"),
-                TimelineEvent(timestamp="2024-01-15T14:10:00Z", event="Event 2", source="auth-service"),
-                TimelineEvent(timestamp="2024-01-15T14:20:00Z", event="Event 3", source="auth-service"),
-                TimelineEvent(timestamp="2024-01-15T14:35:00Z", event="Event 4", source="kubernetes"),
-                TimelineEvent(timestamp="2024-01-15T14:45:00Z", event="Event 5", source="auth-service"),
+                TimelineEvent(
+                    timestamp="2024-01-15T14:00:00Z", event="Event 1", source="postgresql"
+                ),
+                TimelineEvent(
+                    timestamp="2024-01-15T14:10:00Z", event="Event 2", source="auth-service"
+                ),
+                TimelineEvent(
+                    timestamp="2024-01-15T14:20:00Z", event="Event 3", source="auth-service"
+                ),
+                TimelineEvent(
+                    timestamp="2024-01-15T14:35:00Z", event="Event 4", source="kubernetes"
+                ),
+                TimelineEvent(
+                    timestamp="2024-01-15T14:45:00Z", event="Event 5", source="auth-service"
+                ),
             ],
             action_items=[
                 ActionItem(action="Optimize queries", owner="db-team", priority=Priority.P0),
                 ActionItem(action="Add deadlock monitoring", owner="db-team", priority=Priority.P1),
-                ActionItem(action="Review transaction isolation", owner="db-team", priority=Priority.P2),
+                ActionItem(
+                    action="Review transaction isolation", owner="db-team", priority=Priority.P2
+                ),
             ],
             metadata=IncidentMetadata(
                 model="gpt-4o-mini",
@@ -175,7 +204,7 @@ class TestJSONLExporter:
 
             for i, line in enumerate(lines):
                 data = json.loads(line)
-                assert data["id"] == f"INC-2024-{i+1:04d}"
+                assert data["id"] == f"INC-2024-{i + 1:04d}"
 
 
 class TestParquetExporter:
@@ -197,6 +226,7 @@ class TestParquetExporter:
 
             # Verify content with pandas
             import pandas as pd
+
             df = pd.read_parquet(output_path)
             assert len(df) == 2
             assert "id" in df.columns
@@ -253,6 +283,7 @@ class TestExporterManager:
             parquet_path = paths["parquet"]
             assert parquet_path.exists()
             import pandas as pd
+
             df = pd.read_parquet(parquet_path)
             assert len(df) == 2
 

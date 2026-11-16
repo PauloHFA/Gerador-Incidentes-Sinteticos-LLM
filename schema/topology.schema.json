@@ -1,0 +1,240 @@
+{
+  "$defs": {
+    "Service": {
+      "additionalProperties": false,
+      "description": "Service definition in the topology.",
+      "properties": {
+        "name": {
+          "description": "Unique service name",
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "technology": {
+          "description": "Technology stack",
+          "items": {
+            "$ref": "#/$defs/ServiceTechnology"
+          },
+          "minItems": 1,
+          "title": "Technology",
+          "type": "array"
+        },
+        "slo": {
+          "$ref": "#/$defs/ServiceSLO",
+          "description": "Service Level Objectives"
+        },
+        "dependencies": {
+          "description": "Downstream dependencies",
+          "items": {
+            "$ref": "#/$defs/ServiceDependency"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "team": {
+          "description": "Owning team name",
+          "minLength": 1,
+          "title": "Team",
+          "type": "string"
+        },
+        "region": {
+          "default": "us-east-1",
+          "description": "Deployment region",
+          "minLength": 1,
+          "title": "Region",
+          "type": "string"
+        },
+        "replicas": {
+          "default": 3,
+          "description": "Number of replicas",
+          "minimum": 1,
+          "title": "Replicas",
+          "type": "integer"
+        },
+        "language": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Primary programming language",
+          "title": "Language"
+        },
+        "framework": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Primary framework",
+          "title": "Framework"
+        }
+      },
+      "required": [
+        "name",
+        "technology",
+        "slo",
+        "team"
+      ],
+      "title": "Service",
+      "type": "object"
+    },
+    "ServiceDependency": {
+      "additionalProperties": false,
+      "description": "Service dependency with traffic info.",
+      "properties": {
+        "target": {
+          "description": "Target service name",
+          "minLength": 1,
+          "title": "Target",
+          "type": "string"
+        },
+        "traffic_percentage": {
+          "description": "Percentage of traffic to this dependency",
+          "maximum": 100.0,
+          "minimum": 0.0,
+          "title": "Traffic Percentage",
+          "type": "number"
+        },
+        "critical": {
+          "default": true,
+          "description": "Whether this dependency is critical for availability",
+          "title": "Critical",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "target",
+        "traffic_percentage"
+      ],
+      "title": "ServiceDependency",
+      "type": "object"
+    },
+    "ServiceSLO": {
+      "additionalProperties": false,
+      "description": "Service Level Objectives.",
+      "properties": {
+        "availability_target": {
+          "description": "Availability target (e.g., 0.9995)",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Availability Target",
+          "type": "number"
+        },
+        "latency_p99_ms": {
+          "description": "P99 latency target in milliseconds",
+          "exclusiveMinimum": 0,
+          "title": "Latency P99 Ms",
+          "type": "integer"
+        },
+        "throughput_rps": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Target throughput in requests per second",
+          "title": "Throughput Rps"
+        }
+      },
+      "required": [
+        "availability_target",
+        "latency_p99_ms"
+      ],
+      "title": "ServiceSLO",
+      "type": "object"
+    },
+    "ServiceTechnology": {
+      "additionalProperties": false,
+      "description": "Technology stack for a service.",
+      "properties": {
+        "name": {
+          "description": "Technology name (e.g., PostgreSQL, Redis, Kafka)",
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Version if applicable",
+          "title": "Version"
+        },
+        "category": {
+          "description": "Category: database, cache, messaging, compute, network, deploy",
+          "minLength": 1,
+          "title": "Category",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "category"
+      ],
+      "title": "ServiceTechnology",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "System topology definition.",
+  "properties": {
+    "version": {
+      "default": "1.0",
+      "description": "Topology schema version",
+      "title": "Version",
+      "type": "string"
+    },
+    "services": {
+      "description": "List of services",
+      "items": {
+        "$ref": "#/$defs/Service"
+      },
+      "minItems": 1,
+      "title": "Services",
+      "type": "array"
+    },
+    "global_slo": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ServiceSLO"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Global SLO overriding service SLOs"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "description": "Additional metadata",
+      "title": "Metadata",
+      "type": "object"
+    }
+  },
+  "required": [
+    "services"
+  ],
+  "title": "Topology",
+  "type": "object"
+}

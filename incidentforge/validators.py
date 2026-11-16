@@ -11,7 +11,6 @@ from pydantic import ValidationError
 
 from .models import (
     Incident,
-    IncidentMetadata,
     Service,
     Topology,
     ValidationResult,
@@ -41,8 +40,8 @@ class SchemaValidator:
         Returns:
             ValidationResult with any schema errors.
         """
-        errors = []
-        warnings = []
+        errors: list[str] = []
+        warnings: list[str] = []
 
         try:
             # Re-validate to catch any issues
@@ -76,8 +75,8 @@ class SemanticValidator:
         Returns:
             ValidationResult with any semantic errors.
         """
-        errors = []
-        warnings = []
+        errors: list[str] = []
+        warnings: list[str] = []
 
         # 1. Timeline chronological order
         timeline_errors = self._validate_timeline_order(incident)
@@ -116,7 +115,7 @@ class SemanticValidator:
 
     def _validate_timeline_order(self, incident: Incident) -> list[str]:
         """Validate timeline events are in strictly increasing order."""
-        errors = []
+        errors: list[str] = []
         if len(incident.timeline) < 2:
             return errors
 
@@ -131,7 +130,7 @@ class SemanticValidator:
             if prev_time is not None and curr_time <= prev_time:
                 errors.append(
                     f"Timeline event {i} ({curr_time.isoformat()}) is not strictly after "
-                    f"event {i-1} ({prev_time.isoformat()})"
+                    f"event {i - 1} ({prev_time.isoformat()})"
                 )
             prev_time = curr_time
 
@@ -139,7 +138,7 @@ class SemanticValidator:
 
     def _validate_duration_consistency(self, incident: Incident) -> list[str]:
         """Validate outage_duration_minutes matches timeline."""
-        errors = []
+        errors: list[str] = []
         if not incident.timeline:
             return errors
 
@@ -174,15 +173,11 @@ class SemanticValidator:
             errors.append(f"Service '{incident.service}' not found in topology")
             return errors
 
-        # Failure category should be applicable to service technologies
-        tech_names = [t.name.lower() for t in service.technology]
-        # This would need failure catalog context; skip for now
-
         return errors
 
     def _validate_root_cause_technology(self, incident: Incident) -> list[str]:
         """Validate root cause mentions at least one service technology."""
-        errors = []
+        errors: list[str] = []
         service = self.context.topology.get_service(incident.service)
         if service is None:
             return errors
@@ -210,9 +205,7 @@ class SemanticValidator:
         errors = []
 
         if not (2 <= len(incident.action_items) <= 8):
-            errors.append(
-                f"Action items count {len(incident.action_items)} not in range 2-8"
-            )
+            errors.append(f"Action items count {len(incident.action_items)} not in range 2-8")
 
         for i, item in enumerate(incident.action_items):
             if len(item.action) < 10:
@@ -290,7 +283,10 @@ class SecurityValidator:
 
     INJECTION_PATTERNS = [
         (r"ignore\s+(?:previous|above|all)\s+(?:instructions|rules|prompts?)", "prompt_injection"),
-        (r"disregard\s+(?:previous|above|all)\s+(?:instructions|rules|prompts?)", "prompt_injection"),
+        (
+            r"disregard\s+(?:previous|above|all)\s+(?:instructions|rules|prompts?)",
+            "prompt_injection",
+        ),
         (r"system\s*:\s*you\s+are", "role_injection"),
         (r"<\|im_start\|>", "token_injection"),
         (r"<\|im_end\|>", "token_injection"),
@@ -309,8 +305,8 @@ class SecurityValidator:
         Returns:
             ValidationResult with any security errors.
         """
-        errors = []
-        warnings = []
+        errors: list[str] = []
+        warnings: list[str] = []
 
         # Check all text fields for PII
         text_fields = {
@@ -322,15 +318,11 @@ class SecurityValidator:
         for field_name, text in text_fields.items():
             pii_found = self._scan_pii(text)
             for pattern, pii_type in pii_found:
-                errors.append(
-                    f"Potential {pii_type} detected in {field_name}: {pattern[:50]}..."
-                )
+                errors.append(f"Potential {pii_type} detected in {field_name}: {pattern[:50]}...")
 
             injection_found = self._scan_injection(text)
             for pattern, inj_type in injection_found:
-                errors.append(
-                    f"Potential {inj_type} detected in {field_name}: {pattern[:50]}..."
-                )
+                errors.append(f"Potential {inj_type} detected in {field_name}: {pattern[:50]}...")
 
         # Check metadata for sensitive info
         if incident.metadata.model:
@@ -432,65 +424,13 @@ def validate_incident(incident: Incident, topology: Topology) -> list[Validation
     """
     service = topology.get_service(incident.service)
     if service is None:
-        return [ValidationResult(
-            valid=False,
-            errors=[f"Service '{incident.service}' not found in topology"],
-            layer="schema",
-        )]
+        return [
+            ValidationResult(
+                valid=False,
+                errors=[f"Service '{incident.service}' not found in topology"],
+                layer="schema",
+            )
+        ]
 
     validator = create_validator(topology, service)
     return validator.validate(incident)
-
-
-if __name__ == "__main__":
-    # Test validators
-    from .topology import load_topology
-    from .models import Incident, TimelineEvent, SLAImpact, ActionItem, IncidentMetadata, Severity, FailureCategory, Priority, Language, Style, ArchitectureProfile
-
-    topology = load_topology("configs/topology_sample.yaml")
-    service = topology.get_service("api-gateway")
-
-    # Create a test incident
-    incident = Incident(
-        id="INC-2024-0001",
-        service="api-gateway",
-        severity=Severity.SEV_2,
-        outage_duration_minutes=30,
-        failure_category=FailureCategory.CONNECTION_LEAK,
-        sla_impact=SLAImpact(
-            availability_before=0.9999,
-            availability_after=0.9950,
-            p99_latency_ms=5000,
-        ),
-        root_cause_analysis="A connection leak in the nginx upstream module caused pool exhaustion. The HikariCP pool was not returning connections properly after requests to the auth-service.",
-        timeline=[
-            TimelineEvent(timestamp="2024-01-15T10:00:00Z", event="Connection pool usage starts increasing", source="nginx", severity=Severity.SEV_4),
-            TimelineEvent(timestamp="2024-01-15T10:05:00Z", event="First 503 errors observed", source="api-gateway", severity=Severity.SEV_3),
-            TimelineEvent(timestamp="2024-01-15T10:15:00Z", event="Pool exhaustion, all requests failing", source="api-gateway", severity=Severity.SEV_2),
-            TimelineEvent(timestamp="2024-01-15T10:25:00Z", event="Restart of api-gateway pods", source="kubernetes", severity=Severity.SEV_2),
-            TimelineEvent(timestamp="2024-01-15T10:30:00Z", event="Service recovered", source="api-gateway", severity=Severity.SEV_4),
-        ],
-        action_items=[
-            ActionItem(action="Fix connection leak in nginx upstream configuration", owner="platform-team", priority=Priority.P0),
-            ActionItem(action="Add connection pool monitoring and alerts", owner="platform-team", priority=Priority.P1),
-        ],
-        metadata=IncidentMetadata(
-            model="gpt-4o-mini",
-            prompt_version="1.0",
-            seed=42,
-            generated_at="2024-01-15T11:00:00Z",
-            schema_version="1.0",
-            synthetic=True,
-        ),
-    )
-
-    validator = create_validator(topology, service)
-    results = validator.validate(incident)
-
-    for result in results:
-        print(f"\n=== {result.layer.upper()} ===")
-        print(f"Valid: {result.valid}")
-        for err in result.errors:
-            print(f"  ERROR: {err}")
-        for warn in result.warnings:
-            print(f"  WARN: {warn}")

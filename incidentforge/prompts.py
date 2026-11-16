@@ -2,21 +2,20 @@
 
 from __future__ import annotations
 
+import json
+import re
 from pathlib import Path
 from typing import Any
 
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+from jinja2 import Environment, FileSystemLoader, Template, select_autoescape
 
 from .models import (
-    ArchitectureProfile,
     GenerationTask,
     Language,
     Service,
-    Severity,
     Style,
     Topology,
 )
-
 
 # Jinja2 environment
 PROMPTS_DIR = Path(__file__).parent / "prompts"
@@ -29,8 +28,26 @@ _env = Environment(
     lstrip_blocks=True,
 )
 
+_CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+_INJECTION_PHRASE_RE = re.compile(
+    r"(ignore\s+(?:previous|above|all)\s+(?:instructions|rules|prompts?)"
+    r"|disregard\s+(?:previous|above|all)\s+(?:instructions|rules|prompts?)"
+    r"|<\s*\|?\s*im_(?:start|end)\s*\|?\s*>)",
+    re.IGNORECASE,
+)
 
-def _get_template(name: str):
+
+def sanitize_prompt_data(value: str, max_length: int = 240) -> str:
+    """Sanitize untrusted topology/catalog text treated as data inside prompts."""
+    cleaned = _CONTROL_CHAR_RE.sub("", value)
+    cleaned = _INJECTION_PHRASE_RE.sub("[filtered]", cleaned)
+    cleaned = " ".join(cleaned.splitlines()).strip()
+    if len(cleaned) > max_length:
+        cleaned = cleaned[:max_length].rstrip() + "..."
+    return cleaned
+
+
+def _get_template(name: str) -> Template:
     """Get or create template."""
     template_path = PROMPTS_DIR / name
     if not template_path.exists():
@@ -221,6 +238,8 @@ Rate each from 1 (poor) to 5 (excellent):
 }
 ```"""
 
+    (PROMPTS_DIR / "judge_v1.j2").write_text(judge_template, encoding="utf-8")
+
 
 def render_incident_prompt(
     task: GenerationTask,
@@ -232,20 +251,23 @@ def render_incident_prompt(
 ) -> str:
     """Render incident generation prompt."""
     template = _get_template("incident_v1.j2")
-    return template.render(
-        task=task,
-        service=service,
-        technologies=technologies,
-        topology=topology,
-        architecture_profile=task.architecture_profile,
-        language=task.language,
-        style=task.style,
-        failure_category=task.failure_category,
-        severity=task.severity,
-        model=model,
-        seed=seed,
-        Style=Style,
-        Language=Language,
+    sanitized_techs = [sanitize_prompt_data(t, max_length=80) for t in technologies]
+    return str(
+        template.render(
+            task=task,
+            service=service,
+            technologies=sanitized_techs,
+            topology=topology,
+            architecture_profile=task.architecture_profile,
+            language=task.language,
+            style=task.style,
+            failure_category=task.failure_category,
+            severity=task.severity,
+            model=model,
+            seed=seed,
+            Style=Style,
+            Language=Language,
+        )
     )
 
 
@@ -258,23 +280,18 @@ def render_correction_prompt(
 ) -> str:
     """Render correction prompt."""
     template = _get_template("correction_v1.j2")
-    return template.render(
-        original_prompt=original_prompt,
-        error=error,
-        attempt=attempt,
-        max_attempts=max_attempts,
-        task=task,
+    return str(
+        template.render(
+            original_prompt=original_prompt,
+            error=sanitize_prompt_data(error, max_length=1000),
+            attempt=attempt,
+            max_attempts=max_attempts,
+            task=task,
+        )
     )
 
 
-def render_judge_prompt(incident: dict) -> str:
+def render_judge_prompt(incident: dict[str, Any]) -> str:
     """Render LLM-as-judge evaluation prompt."""
     template = _get_template("judge_v1.j2")
-    import json
-    return template.render(incident_json=json.dumps(incident, indent=2, ensure_ascii=False))
-
-
-if __name__ == "__main__":
-    # Create default templates
-    _create_default_templates()
-    print("Default prompt templates created in", PROMPTS_DIR)
+    return str(template.render(incident_json=json.dumps(incident, indent=2, ensure_ascii=False)))

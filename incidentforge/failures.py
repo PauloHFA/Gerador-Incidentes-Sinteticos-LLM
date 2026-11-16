@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 import yaml
-from pydantic import ValidationError
 
-from .models import FailureCatalog, FailureTemplate, FailureCategory
+from .models import FailureCatalog, FailureTemplate
 
 
 class FailureCatalogLoader:
@@ -262,7 +260,7 @@ failures:
     tags: ["deploy", "database", "schema", "migration"]
 """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._default_catalog: FailureCatalog | None = None
 
     @property
@@ -296,7 +294,7 @@ failures:
         if not path.exists():
             raise FileNotFoundError(f"Failures file not found: {path}")
 
-        with open(path, "r", encoding="utf-8") as f:
+        with path.open(encoding="utf-8") as f:
             try:
                 data = yaml.safe_load(f)
             except yaml.YAMLError as e:
@@ -307,11 +305,7 @@ failures:
 
         return FailureCatalog.model_validate(data)
 
-    def merge_catalogs(
-        self,
-        user_catalog: FailureCatalog,
-        mode: str = "extend"
-    ) -> FailureCatalog:
+    def merge_catalogs(self, user_catalog: FailureCatalog, mode: str = "extend") -> FailureCatalog:
         """
         Merge user catalog with default catalog.
 
@@ -334,19 +328,15 @@ failures:
 
         # Ensure we have at least 25 categories
         if len(merged) < 25:
-            raise ValueError(
-                f"Merged catalog has only {len(merged)} categories, minimum is 25"
-            )
+            raise ValueError(f"Merged catalog has only {len(merged)} categories, minimum is 25")
 
         return FailureCatalog(
             version=user_catalog.version or self.default_catalog.version,
-            failures=list(merged.values())
+            failures=list(merged.values()),
         )
 
     def get_applicable_failures(
-        self,
-        catalog: FailureCatalog,
-        technologies: list[str]
+        self, catalog: FailureCatalog, technologies: list[str]
     ) -> list[FailureTemplate]:
         """
         Get failures applicable to the given technologies.
@@ -358,7 +348,7 @@ failures:
         Returns:
             List of applicable failure templates.
         """
-        tech_set = set(t.lower() for t in technologies)
+        tech_set = {t.lower() for t in technologies}
         applicable = []
 
         for failure in catalog.failures:
@@ -371,9 +361,7 @@ failures:
         return applicable
 
     def filter_incompatible(
-        self,
-        failures: list[FailureTemplate],
-        technologies: list[str]
+        self, failures: list[FailureTemplate], technologies: list[str]
     ) -> tuple[list[FailureTemplate], list[FailureTemplate]]:
         """
         Filter failures compatible with service technologies.
@@ -385,15 +373,14 @@ failures:
         Returns:
             Tuple of (compatible_failures, incompatible_failures).
         """
-        tech_set = set(t.lower() for t in technologies)
+        tech_set = {t.lower() for t in technologies}
         compatible = []
         incompatible = []
 
         for failure in failures:
             # Check if failure has at least one applicable technology in service
             has_match = any(
-                app_tech.lower() in tech_set
-                for app_tech in failure.applicable_technologies
+                app_tech.lower() in tech_set for app_tech in failure.applicable_technologies
             )
             if has_match:
                 compatible.append(failure)
@@ -403,10 +390,7 @@ failures:
         return compatible, incompatible
 
 
-def load_failure_catalog(
-    path: str | Path | None = None,
-    mode: str = "extend"
-) -> FailureCatalog:
+def load_failure_catalog(path: str | Path | None = None, mode: str = "extend") -> FailureCatalog:
     """
     Convenience function to load failure catalog.
 
@@ -424,32 +408,3 @@ def load_failure_catalog(
 
     user_catalog = loader.load_from_file(path)
     return loader.merge_catalogs(user_catalog, mode)
-
-
-if __name__ == "__main__":
-    import sys
-
-    if len(sys.argv) > 1:
-        failures_path = sys.argv[1]
-    else:
-        failures_path = "configs/failures_default.yaml"
-
-    try:
-        catalog = load_failure_catalog(failures_path)
-        print(f"[OK] Failure catalog loaded: {len(catalog.failures)} categories")
-
-        # Show categories by type
-        categories = {}
-        for f in catalog.failures:
-            cat = f.category
-            if cat not in categories:
-                categories[cat] = 0
-            categories[cat] += 1
-
-        print("\nCategories:")
-        for cat, count in sorted(categories.items()):
-            print(f"  {cat}: {count} templates")
-
-    except Exception as e:
-        print(f"[ERROR] Failed to load failure catalog: {e}")
-        sys.exit(1)

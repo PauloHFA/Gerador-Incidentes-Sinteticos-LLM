@@ -15,7 +15,6 @@ from chromadb.config import Settings
 from sentence_transformers import SentenceTransformer
 
 from incidentforge.models import Incident
-from incidentforge.exporter import export_incidents
 
 
 async def load_incidents(input_dir: Path) -> list[Incident]:
@@ -40,13 +39,17 @@ async def load_incidents(input_dir: Path) -> list[Incident]:
 def create_chroma_client(persist_dir: Path) -> chromadb.Client:
     """Create ChromaDB client with persistence."""
     persist_dir.mkdir(parents=True, exist_ok=True)
-    return chromadb.Client(Settings(
-        persist_directory=str(persist_dir),
-        anonymized_telemetry=False,
-    ))
+    return chromadb.Client(
+        Settings(
+            persist_directory=str(persist_dir),
+            anonymized_telemetry=False,
+        )
+    )
 
 
-def get_embedding_model(model_name: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2") -> SentenceTransformer:
+def get_embedding_model(
+    model_name: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+) -> SentenceTransformer:
     """Load sentence transformer model for embeddings."""
     return SentenceTransformer(model_name)
 
@@ -139,14 +142,17 @@ def print_search_results(results: dict[str, Any]) -> None:
     print(f"\nFound {len(results['ids'][0])} results:")
     print("-" * 80)
 
-    for i, (doc_id, document, metadata, distance) in enumerate(zip(
-        results["ids"][0],
-        results["documents"][0],
-        results["metadatas"][0],
-        results["distances"][0],
-    )):
+    for i, (doc_id, document, metadata, distance) in enumerate(
+        zip(
+            results["ids"][0],
+            results["documents"][0],
+            results["metadatas"][0],
+            results["distances"][0],
+            strict=False,
+        )
+    ):
         similarity = 1 - distance
-        print(f"\n{i+1}. {doc_id} (similarity: {similarity:.3f})")
+        print(f"\n{i + 1}. {doc_id} (similarity: {similarity:.3f})")
         print(f"   Service: {metadata['service']}")
         print(f"   Severity: {metadata['severity']}")
         print(f"   Category: {metadata['category']}")
