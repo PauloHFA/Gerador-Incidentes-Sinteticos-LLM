@@ -407,7 +407,7 @@ class DatasetCardGenerator:
             "## Dataset Description",
             "",
             "This dataset contains synthetically generated production incident post-mortems "
-            "created by [IncidentForge](https://github.com/PauloHFA/IncidentForge). "
+            "created by [Gerador-Incidentes-Sinteticos-LLM](https://github.com/PauloHFA/Gerador-Incidentes-Sinteticos-LLM) (`incidentforge`). "
             "The incidents are generated from system topology descriptions using LLMs, "
             "and are designed for:",
             "",
@@ -504,7 +504,7 @@ class DatasetCardGenerator:
                 "  title={IncidentForge: Synthetic Incident Post-Mortem Generator},",
                 "  author={IncidentForge Contributors},",
                 "  year={2026},",
-                "  url={https://github.com/PauloHFA/IncidentForge}",
+                "  url={https://github.com/PauloHFA/Gerador-Incidentes-Sinteticos-LLM}",
                 "}",
                 "```",
                 "",
@@ -517,7 +517,7 @@ class DatasetCardGenerator:
                 "",
                 "## Contact",
                 "",
-                "For questions or contributions, visit [IncidentForge GitHub](https://github.com/PauloHFA/IncidentForge).",
+                "For questions or contributions, visit [Gerador-Incidentes-Sinteticos-LLM GitHub](https://github.com/PauloHFA/Gerador-Incidentes-Sinteticos-LLM).",
             ]
         )
 

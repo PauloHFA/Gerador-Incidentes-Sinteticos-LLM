@@ -1,4 +1,4 @@
-# Pendências — IncidentForge
+# Pendências — Gerador-Incidentes-Sinteticos-LLM (`incidentforge`)
 
 ## 1. Implementado e Verificado Nesta Auditoria
 

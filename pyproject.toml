@@ -68,9 +68,9 @@ docs = [
 incidentforge = "incidentforge.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/PauloHFA/IncidentForge"
-Repository = "https://github.com/PauloHFA/IncidentForge"
-Issues = "https://github.com/PauloHFA/IncidentForge/issues"
+Homepage = "https://github.com/PauloHFA/Gerador-Incidentes-Sinteticos-LLM"
+Repository = "https://github.com/PauloHFA/Gerador-Incidentes-Sinteticos-LLM"
+Issues = "https://github.com/PauloHFA/Gerador-Incidentes-Sinteticos-LLM/issues"
 
 [tool.uv]
 dev-dependencies = [

@@ -1,8 +1,8 @@
-# IncidentForge
+# Gerador-Incidentes-Sinteticos-LLM
 
-**Synthetic post-mortem and chaos scenario generator for observability testing, RAG pipelines, and incident response training.**
+**Synthetic post-mortem and chaos scenario generator for observability testing, RAG pipelines, and incident response training** *(pacote/CLI interno: `incidentforge`)*.
 
-IncidentForge generates realistic incident reports from system topology YAML, producing JSONL datasets and Markdown reports without exposing real production data.
+Gerador-Incidentes-Sinteticos-LLM (`incidentforge`) generates realistic incident reports from system topology YAML, producing JSONL datasets and Markdown reports without exposing real production data.
 
 ## Features
 
@@ -109,7 +109,7 @@ failures:
 
 ## LLM Configuration
 
-IncidentForge supports any OpenAI-compatible API:
+Gerador-Incidentes-Sinteticos-LLM (`incidentforge`) supports any OpenAI-compatible API:
 
 ```bash
 # OpenAI
@@ -236,13 +236,13 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 ## Citation
 
-If you use IncidentForge in your research, please cite:
+If you use Gerador-Incidentes-Sinteticos-LLM (`incidentforge`) in your research, please cite:
 
 ```bibtex
 @software{incidentforge,
-  title = {IncidentForge: Synthetic Post-Mortem Generator},
+  title = {Gerador-Incidentes-Sinteticos-LLM (incidentforge): Synthetic Post-Mortem Generator},
   author = {IncidentForge Contributors},
-  year = {2024},
-  url = {https://github.com/PauloHFA/IncidentForge}
+  year = {2026},
+  url = {https://github.com/PauloHFA/Gerador-Incidentes-Sinteticos-LLM}
 }
 ```

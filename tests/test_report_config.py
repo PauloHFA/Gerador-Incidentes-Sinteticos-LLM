@@ -55,7 +55,9 @@ async def test_quality_reporter_and_dataset_card(
     assert paths["markdown"].exists()
     assert paths["json"].exists()
     assert paths["dataset_card"].exists()
-    assert "PauloHFA/IncidentForge" in paths["dataset_card"].read_text(encoding="utf-8")
+    assert "PauloHFA/Gerador-Incidentes-Sinteticos-LLM" in paths["dataset_card"].read_text(
+        encoding="utf-8"
+    )
 
 
 def test_empty_reporter():
